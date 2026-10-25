@@ -310,6 +310,9 @@
   A.kundeLoeschen = async (el) => {
     const id = el.dataset.id, marke = SuS.navMarke();
     if (SuS.daten.dokumente.some((d) => d.kundeId === id)) { SuS.melde('Dieser Kunde hat Angebote oder Rechnungen und bleibt deshalb erhalten.', true); return; }
+    if (SuS.daten.projekte.some((p) => p.kundeId === id) || SuS.daten.vertraege.some((v) => v.kundeId === id)) {  // Fund Cursor R14
+      SuS.melde('Dieser Kunde hat Baustellen oder Pflegeverträge und bleibt deshalb erhalten.', true); return;
+    }
     if (!SuS.sicher(el)) return;
     if (!(await SuS.transaktionSicher(() => { SuS.daten.kunden = SuS.daten.kunden.filter((k) => k.id !== id); }))) {
       SuS.melde('Speichern fehlgeschlagen – der Kunde bleibt.', true); return;  // Fund Cursor R13

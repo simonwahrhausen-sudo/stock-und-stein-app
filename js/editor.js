@@ -472,6 +472,8 @@
     const d = aktuell;
     if (d.fest) return;
     if (SuS.daten.dokumente.some((x) => x.vonId === d.id && x.fest)) { SuS.melde('Zu diesem Angebot gibt es gestellte Rechnungen – es bleibt erhalten.', true); return; }
+    /* Auch Entwürfe von Abschlag/Rechnung hängen am Angebot (Auftragssumme) – erst diese löschen (Fund Cursor R14) */
+    if (SuS.daten.dokumente.some((x) => x.vonId === d.id && x.typ !== 'storno')) { SuS.melde('Zu diesem Angebot gibt es noch Rechnungs- oder Abschlagsentwürfe. Bitte zuerst diese löschen.', true); return; }
     if (d.unterschrift) { SuS.melde('Dieses Angebot ist vom Kunden unterschrieben und bleibt erhalten.', true); return; }
     if (!SuS.sicher(el)) return;
     let hinweis = '';
