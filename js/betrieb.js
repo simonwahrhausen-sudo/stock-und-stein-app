@@ -408,9 +408,10 @@
     return '"' + t.replace(/"/g, '""') + '"';
   };
   const centFeld = (c) => ((c || 0) / 100).toFixed(2).replace('.', ',');
-  SuS.ausgangsbuchCsv = (jahr) => {
+  /* filter (optional): Funktion auf das Datum – z. B. Monat/Quartal für das Paket an den Steuerberater */
+  SuS.ausgangsbuchCsv = (jahr, filter) => {
     const zeilen = [['Rechnungsnummer', 'Art', 'Datum', 'Leistung von', 'Leistung bis', 'Kunde', 'Netto', 'USt-Satz', 'USt', 'Brutto', 'Abzüge Abschläge', 'Zahlbetrag', 'Mahngebühren', 'Bezahlt', 'davon Skonto', 'Offen', 'Status'].map(csvFeld).join(';')];
-    SuS.daten.dokumente.filter((d) => SuS.istRechnung(d) && d.fest && (!jahr || d.datum.slice(0, 4) === String(jahr)))
+    SuS.daten.dokumente.filter((d) => SuS.istRechnung(d) && d.fest && (!jahr || d.datum.slice(0, 4) === String(jahr)) && (!filter || filter(d.datum)))
       .sort((a, b) => a.nummer.localeCompare(b.nummer))
       .forEach((d) => {
         const s = SuS.summen(d), k = SuS.kundeVon(d);
@@ -420,9 +421,9 @@
       });
     return '﻿' + zeilen.join('\r\n') + '\r\n';
   };
-  SuS.ausgabenCsv = (jahr) => {
+  SuS.ausgabenCsv = (jahr, filter) => {
     const zeilen = [['Datum', 'Lieferant', 'Belegnummer', 'Was', 'Art', 'Baustelle', 'Netto', 'USt-Satz', 'Vorsteuer', 'Brutto', 'Bezahlt'].map(csvFeld).join(';')];
-    SuS.daten.ausgaben.filter((a) => !jahr || a.datum.slice(0, 4) === String(jahr)).sort((a, b) => a.datum.localeCompare(b.datum)).forEach((a) => {
+    SuS.daten.ausgaben.filter((a) => (!jahr || a.datum.slice(0, 4) === String(jahr)) && (!filter || filter(a.datum))).sort((a, b) => a.datum.localeCompare(b.datum)).forEach((a) => {
       const p = a.projektId ? SuS.projekt(a.projektId) : null;
       zeilen.push([SuS.datum(a.datum), a.lieferant, a.nummer, a.text, SuS.AUSGABE_ARTEN[a.art], p ? p.nr + ' ' + p.titel : '', centFeld(SuS.ausgabeNetto(a)),
         String(a.satz), centFeld(SuS.ausgabeSteuer(a)), centFeld(a.brutto), a.bezahlt ? 'ja' : 'nein'].map(csvFeld).join(';'));
@@ -453,14 +454,18 @@
     if (typeof eintrag === 'object') return { konto: eintrag[a.satz] || eintrag[0], bu: '' };
     return { konto: eintrag, bu: a.satz === 19 ? '9' : a.satz === 7 ? '8' : '' };
   };
-  SuS.datevBuchungsstapel = (jahr) => {
+  /* von/bis (optional, JJJJ-MM-TT im selben Jahr): nur Buchungen dieses Zeitraums (Monat/Quartal fürs Steuerberater-Paket) */
+  SuS.datevBuchungsstapel = (jahr, von, bis) => {
     const f = SuS.daten.firma, j = String(jahr), K = SuS.DATEV_KONTEN[f.skr] || SuS.DATEV_KONTEN['03'];
+    const drin = (d) => d.slice(0, 4) === j && (!von || d >= von) && (!bis || d <= bis);
+    const kompakt = (d) => d.replace(/-/g, '');
     if (!/^\d{4,7}$/.test(f.beraterNr) || Number(f.beraterNr) < 1001 || !/^\d{1,5}$/.test(f.mandantNr) || !Number(f.mandantNr))
       throw new Error('Bitte zuerst Berater- und Mandantennummer eintragen (gibt der Steuerberater).');
     const q = (t) => '"' + String(t == null ? '' : t).replace(/"/g, '""') + '"';
     const jetzt = new Date(), zwei = (n) => String(n).padStart(2, '0');
     const stempel = jetzt.getFullYear() + zwei(jetzt.getMonth() + 1) + zwei(jetzt.getDate()) + zwei(jetzt.getHours()) + zwei(jetzt.getMinutes()) + zwei(jetzt.getSeconds()) + '000';
-    const kopf = ['"EXTF"', 700, 21, '"Buchungsstapel"', 13, stempel, '', '"RE"', '""', '""', f.beraterNr, f.mandantNr, j + '0101', 4, j + '0101', j + '1231',
+    const kopf = ['"EXTF"', 700, 21, '"Buchungsstapel"', 13, stempel, '', '"RE"', '""', '""', f.beraterNr, f.mandantNr, j + '0101', 4,
+      von && von.slice(0, 4) === j ? kompakt(von) : j + '0101', bis && bis.slice(0, 4) === j ? kompakt(bis) : j + '1231',
       q('Stock und Stein ' + j), '""', 1, 0, 0, '"EUR"', '', '""', '', '', q(f.skr), '', '', '""', '""'].join(';');
     const spalten = ['Umsatz (ohne Soll/Haben-Kz)', 'Soll/Haben-Kennzeichen', 'WKZ Umsatz', 'Kurs', 'Basis-Umsatz', 'WKZ Basis-Umsatz', 'Konto',
       'Gegenkonto (ohne BU-Schlüssel)', 'BU-Schlüssel', 'Belegdatum', 'Belegfeld 1', 'Belegfeld 2', 'Skonto', 'Buchungstext'].join(';');
@@ -470,18 +475,18 @@
     const bank = f.bankKonto || K.bank, info = { rechnungen: 0, zahlungen: 0, skonto: 0, ausgaben: 0, vonHand: 0 };
     SuS.daten.dokumente.filter((d) => SuS.istRechnung(d) && d.fest).sort((a, b) => a.nummer.localeCompare(b.nummer)).forEach((d) => {
       const s = SuS.summen(d), k = SuS.kundeVon(d), name = k ? k.name : '';
-      if (d.datum.slice(0, 4) === j && s.zahlbetrag) { zeile(s.zahlbetrag, f.debitor, SuS.datevKonto(s, f.skr), '', d.datum, d.nummer, name + ' ' + SuS.TYPEN[d.typ].name); info.rechnungen++; }
+      if (drin(d.datum) && s.zahlbetrag) { zeile(s.zahlbetrag, f.debitor, SuS.datevKonto(s, f.skr), '', d.datum, d.nummer, name + ' ' + SuS.TYPEN[d.typ].name); info.rechnungen++; }
       /* Mahngebühren: eigene Forderung (nicht umsatzsteuerbar) – sonst stünde die mitbezahlte Gebühr ohne Gegenbuchung (Fund Cursor) */
-      for (const m of d.mahnungen || []) if (m.gebuehr && m.datum.slice(0, 4) === j) zeile(m.gebuehr, f.debitor, K.mahn, '', m.datum, d.nummer, 'Mahngebühr ' + name);
+      for (const m of d.mahnungen || []) if (m.gebuehr && drin(m.datum)) zeile(m.gebuehr, f.debitor, K.mahn, '', m.datum, d.nummer, 'Mahngebühr ' + name);
       for (const z of d.zahlungen || []) {
-        if (z.datum.slice(0, 4) !== j) continue;
+        if (!drin(z.datum)) continue;
         if (z.art === 'skonto') {
           const sk = s.modus === 'regel' && s.satz === 19 ? K.skonto19 : s.modus === 'regel' && s.satz === 7 ? K.skonto7 : K.skonto;
           zeile(z.betrag, sk, f.debitor, '', z.datum, d.nummer, 'Skonto ' + name); info.skonto++;
         } else { zeile(z.betrag, bank, f.debitor, '', z.datum, d.nummer, 'Zahlung ' + name); info.zahlungen++; }
       }
     });
-    SuS.daten.ausgaben.filter((a) => a.datum.slice(0, 4) === j).sort((a, b) => a.datum.localeCompare(b.datum)).forEach((a) => {
+    SuS.daten.ausgaben.filter((a) => drin(a.datum)).sort((a, b) => a.datum.localeCompare(b.datum)).forEach((a) => {
       if (SuS.ausgabeAbweichend(a)) { info.vonHand++; return; }
       const auf = SuS.datevAufwand(a, f.skr);
       zeile(a.brutto, auf.konto, a.bezahlt ? bank : f.kreditor, auf.bu, a.datum, a.nummer, (a.lieferant + ' ' + a.text).trim()); info.ausgaben++;

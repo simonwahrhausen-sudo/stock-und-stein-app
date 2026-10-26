@@ -208,3 +208,10 @@ body.vollbild main { padding-bottom: calc(120px + var(--unten)); }
 .kachel-wert { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; font-family: 'Fraunces', Georgia, serif; }
 .segment button { font-size: 14px; }
 .knopfreihe.eng .knopf { flex: 1 1 0; min-width: 0; }
+
+/* Beleg-Erkennung: Vorschläge aus dem Foto gelb, bis sie angetippt (bestätigt) werden */
+.feld.vorschlag input, .feld.vorschlag select { background: #fff3b0; border-color: #d9a400; box-shadow: 0 0 0 2px rgba(217, 164, 0, .25); }
+.feld.vorschlag > span::after { content: ' · Vorschlag'; color: #8a6400; font-weight: 600; }
+.beleg-erkennung { margin: 8px 0 12px; }
+.beleg-status { margin: 6px 0; }
+.beleg-vorschau { display: block; max-width: 100%; max-height: 220px; margin: 6px auto; border-radius: 10px; }

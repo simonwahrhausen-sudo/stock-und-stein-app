@@ -1,0 +1,11 @@
+Texterkennung in „Stock und Stein · Büro“ – verwendete freie Software (läuft vollständig auf dem Gerät, kein Netzzugriff)
+
+- tesseract.js 7.0.0 (tesseract.min.js, worker.min.js) – Apache License 2.0 – https://github.com/naptha/tesseract.js
+  enthält: buffer (MIT), ieee754 (BSD-3-Clause), regenerator-runtime (MIT), zlib.js (MIT) – siehe *-Drittlizenzen.txt
+- tesseract.js-core 7.0.0 (tesseract-core-*.wasm.js) – Apache License 2.0 – https://github.com/naptha/tesseract.js-core
+  WebAssembly-Fassung von Tesseract OCR (Apache License 2.0, https://github.com/tesseract-ocr/tesseract) mit den
+  unveränderten Bibliotheken aus dem Ordner third_party des Projekts (u. a. Leptonica – Leptonica-Lizenz (BSD-artig),
+  libpng – libpng-Lizenz, zlib – zlib-Lizenz, libjpeg – IJG-Lizenz, libwebp – BSD-3-Clause, libtiff – libtiff-Lizenz).
+- deu.traineddata aus tessdata_fast – Apache License 2.0 – https://github.com/tesseract-ocr/tessdata_fast
+
+Volltexte der Apache License 2.0 liegen in diesem Ordner bei.

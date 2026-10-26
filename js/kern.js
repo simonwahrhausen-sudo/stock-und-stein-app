@@ -120,7 +120,8 @@ SuS.leer = () => ({
   dokumente: [],
   /* Ausbau (Orientierung an Branchen-Software, siehe ORIENTIERUNG.md) */
   projekte: [], aufwand: [], termine: [], mitarbeiter: [], vertraege: [], vorlagen: [], ausgaben: [], bausteine: [],
-  zaehler: {}
+  zaehler: {},
+  lieferantArt: {}  /* Beleg-Erkennung: zuletzt bestätigte Kategorie je Lieferant */
 });
 
 SuS.daten = null;
@@ -140,6 +141,8 @@ SuS.laden = (roh) => {
   d.firma = Object.assign(leer.firma, d.firma || {});
   ['kunden', 'leistungen', 'dokumente', 'projekte', 'aufwand', 'termine', 'mitarbeiter', 'vertraege', 'vorlagen', 'ausgaben', 'bausteine'].forEach((k) => { if (!Array.isArray(d[k])) d[k] = []; });
   if (!d.zaehler || typeof d.zaehler !== 'object' || Array.isArray(d.zaehler)) d.zaehler = {};
+  if (!d.lieferantArt || typeof d.lieferantArt !== 'object' || Array.isArray(d.lieferantArt)) d.lieferantArt = {};
+  for (const k of Object.keys(d.lieferantArt)) if (!/^[a-z0-9äöüß]{1,40}$/.test(k) || !Object.prototype.hasOwnProperty.call(SuS.AUSGABE_ARTEN, d.lieferantArt[k])) delete d.lieferantArt[k];
   SuS.bereinige(d);
   SuS.daten = d;
   SuS.bestaetigt = JSON.stringify(d);  // Ausgangsstand für eine Rücknahme
