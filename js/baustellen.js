@@ -154,6 +154,7 @@
       SuS.daten.termine = SuS.daten.termine.filter((t) => t.projektId !== id);
       SuS.daten.dokumente.forEach((d) => { if (d.projektId === id) d.projektId = ''; });
       SuS.daten.ausgaben.forEach((a) => { if (a.projektId === id) a.projektId = ''; });
+      SuS.daten.ablage.forEach((u) => { if (u.projektId === id) u.projektId = ''; });
       SuS.daten.vertraege.forEach((v) => { if (v.projektId === id) v.projektId = ''; });
     });
     if (!ok) { SuS.melde('Speichern fehlgeschlagen – die Baustelle bleibt.', true); SuS.neuZeichnen(); return; }

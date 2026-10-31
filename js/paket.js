@@ -61,9 +61,12 @@
   };
 
   /* Dateiname-Baustein: nur Buchstaben, Ziffern, Bindestrich */
-  const sauber = (t) => String(t || '').normalize('NFKD').replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/Ä/g, 'Ae').replace(/Ö/g, 'Oe')
-    .replace(/Ü/g, 'Ue').replace(/ß/g, 'ss').replace(/[^A-Za-z0-9-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'Beleg';
-  SuS.belegDateiname = (a, nr) => a.datum + '_' + sauber(a.lieferant || a.text) + '_' + ((a.brutto || 0) / 100).toFixed(2).replace('.', ',') + 'EUR' + (nr ? '_' + (nr + 1) : '') + '.jpg';
+  /* Erst Umlaute ersetzen (NFC), dann übrige Akzente entfernen – sonst wurde aus „Grünland“ „Gru-nland“ (Fund Bedientest 31.10.) */
+  const sauber = (t) => String(t || '').normalize('NFC').replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/Ä/g, 'Ae').replace(/Ö/g, 'Oe')
+    .replace(/Ü/g, 'Ue').replace(/ß/g, 'ss').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'Beleg';
+  SuS.belegDateiname = (a, nr, endung) => a.datum + '_' + sauber(a.lieferant || a.text) + '_' + ((a.brutto || 0) / 100).toFixed(2).replace('.', ',') + 'EUR' + (nr ? '_' + (nr + 1) : '') + (endung || '.jpg');
+  SuS.dateiEndung = (f) => (f && f.typ === 'pdf' ? '.pdf' : '.jpg');  // Eintrag im Bildspeicher → Dateiendung
+  SuS.ablageDateiname = (u, nr, endung) => 'Dokumente/' + sauber(SuS.ABLAGE_ARTEN[u.art] || 'Sonstiges') + '/' + u.datum + '_' + sauber(u.titel) + (nr ? '_' + (nr + 1) : '') + (endung || '.jpg');
 
   /* Zeiträume: letzte 15 Monate und die Quartale dieses und des letzten Jahres */
   SuS.paketZeitraeume = (heute) => {
@@ -83,7 +86,8 @@
 
   /* Paket zusammenstellen → { teile: [{ name, blob, groesse, anzahl }] } – Teile höchstens SuS.PAKET_TEIL_MAX (exakt gerechnet);
      eine einzelne größere Datei bekommt ein eigenes Teil (mit Hinweis). Fotos werden einzeln gelesen (nur für die Prüfsumme). */
-  SuS.steuerPaket = async (z, fortschritt) => {
+  SuS.steuerPaket = async (z, fortschritt, optionen) => {
+    const mitDokumenten = !optionen || optionen.dokumente !== false;  // Dokumente aus dem Zeitraum (Verträge, Versicherungen …)
     const drin = (d) => d >= z.von && d <= z.bis, info = [], meldung = fortschritt || (() => {});
     const namen = new Set();
     const eindeutig = (name) => {  // gleiche Namen (z. B. zwei gleiche Belege an einem Tag) bekommen _2, _3 … (Fund Codex)
@@ -110,13 +114,23 @@
         meldung('Belegfotos … ' + a.datum);
         const liste = await SuS.fotosVon('a' + a.id);
         for (let i = 0; i < liste.length; i++) {
-          gross.push(await eintrag('Belege/' + SuS.belegDateiname(a, liste.length > 1 ? i : 0), liste[i].bild, a.datum));
+          gross.push(await eintrag('Belege/' + SuS.belegDateiname(a, liste.length > 1 ? i : 0, SuS.dateiEndung(liste[i])), liste[i].bild, a.datum));
           fotos++; mitFoto.add(a.id);
         }
       }
     } else info.push('Belegfotos: auf diesem Gerät nicht verfügbar (z. B. im Orchestrator-Fenster).');
+    const ablage = mitDokumenten ? (SuS.daten.ablage || []).filter((u) => drin(u.datum)).sort((a, b) => a.datum.localeCompare(b.datum)) : [];
+    let dokDateien = 0;
+    if (ablage.length && SuS.fotosVerfuegbar && await SuS.fotosVerfuegbar()) {
+      for (const u of ablage) {
+        meldung('Dokumente … ' + u.datum);
+        const liste = await SuS.fotosVon('u' + u.id);
+        for (let i = 0; i < liste.length; i++) { gross.push(await eintrag(SuS.ablageDateiname(u, liste.length > 1 ? i : 0, SuS.dateiEndung(liste[i])), liste[i].bild, u.datum)); dokDateien++; }
+      }
+    } else if (ablage.length) info.push('Dateien der Dokumente: auf diesem Gerät nicht verfügbar.');
     klein.push(await eintrag('Ausgaben.csv', enc.encode(SuS.ausgabenCsv(null, drin)), z.bis));
     klein.push(await eintrag('Ausgangsrechnungen.csv', enc.encode(SuS.ausgangsbuchCsv(null, drin)), z.bis));
+    if (ablage.length) klein.push(await eintrag('Dokumente.csv', enc.encode(SuS.ablageCsv(ablage)), z.bis));
     if (z.von.slice(0, 4) === z.bis.slice(0, 4)) {
       try {
         klein.push(await eintrag('DATEV/EXTF_Buchungsstapel_' + z.kurz + '.csv', new Uint8Array(SuS.winAnsi(SuS.datevBuchungsstapel(z.von.slice(0, 4), z.von, z.bis))), z.bis));
@@ -128,8 +142,9 @@
     const ohneFoto = ausgaben.length - mitFoto.size;
     const lies = ['Paket für den Steuerberater – ' + z.titel + ' (' + SuS.datum(z.von) + ' bis ' + SuS.datum(z.bis) + ')',
       'Firma: ' + (SuS.daten.firma.name || ''), 'Erstellt: ' + SuS.datum(SuS.heute()), '',
-      'Ausgangsrechnungen (PDF): ' + rechnungen.length, 'Ausgaben (Liste Ausgaben.csv): ' + ausgaben.length, 'Belegfotos: ' + fotos +
-      (ohneFoto > 0 ? ' (' + ohneFoto + ' Ausgabe(n) ohne Foto)' : ''), 'Dateinamen der Belege: Datum_Lieferant_Betrag.jpg', ''].concat(info.length ? ['Hinweise:'].concat(info.map((x) => '- ' + x)) : [])
+      'Ausgangsrechnungen (PDF): ' + rechnungen.length, 'Ausgaben (Liste Ausgaben.csv): ' + ausgaben.length, 'Belege (Fotos/PDF): ' + fotos +
+      (ohneFoto > 0 ? ' (' + ohneFoto + ' Ausgabe(n) ohne Foto)' : ''), 'Dateinamen der Belege: Datum_Lieferant_Betrag.jpg (Fotos) bzw. .pdf (Dateien)']
+      .concat(ablage.length ? ['Dokumente ohne Betrag (Liste Dokumente.csv, Ordner Dokumente/): ' + ablage.length + ' mit ' + dokDateien + ' Datei(en)'] : []).concat([''], info.length ? ['Hinweise:'].concat(info.map((x) => '- ' + x)) : [])
       .concat(['', 'Papierbelege bitte trotzdem aufbewahren. Erstellt mit der App „Stock und Stein · Büro“.']).join('\r\n') + '\r\n';
     klein.unshift(await eintrag('LIES-MICH.txt', enc.encode(lies), z.bis));
     /* Aufteilen mit exakter Größe: Teil 1 enthält die Listen */
@@ -153,13 +168,14 @@
     SuS.blatt('Paket für den Steuerberater',
       '<p class="unterzeile">Ein ZIP mit Ausgangsrechnungen (PDF), Belegfotos, Listen (CSV) und DATEV-Datei für den gewählten Zeitraum – zum Teilen per Mail oder Drive.</p>' +
       SuS.feld('zeitraum', 'Zeitraum', z[1] ? z[1].wert : z[0].wert, { typ: 'select', optionen: z.map((x) => [x.wert, x.titel]) }) +
+      '<label class="schalter"><input type="checkbox" name="dokumente" checked><span><b>Dokumente mitschicken</b><small>Verträge, Versicherungen, Lieferscheine … mit Datum im Zeitraum (Mehr → Dokumente)</small></span></label>' +
       '<div class="paket-status unterzeile" aria-live="polite"></div>',
       async (fd, form) => {
         const wahl = SuS.paketZeitraeume().find((x) => x.wert === fd.get('zeitraum'));
         const status = form.querySelector('.paket-status');
         if (!wahl) return false;
         let erg;
-        try { erg = await SuS.steuerPaket(wahl, (t) => { status.textContent = t; }); }
+        try { erg = await SuS.steuerPaket(wahl, (t) => { status.textContent = t; }, { dokumente: fd.get('dokumente') === 'on' }); }
         catch (x) { SuS.melde('Paket konnte nicht erstellt werden: ' + x.message, true); return false; }
         teile = erg.teile;
         if (window.parent !== window) { SuS.melde('Im Orchestrator-Fenster ist Teilen gesperrt – bitte in der Handy-App erstellen.', true); return true; }

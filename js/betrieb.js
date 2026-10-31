@@ -421,11 +421,20 @@
       });
     return '﻿' + zeilen.join('\r\n') + '\r\n';
   };
+  /* Dokumente ohne Betrag (Ablage) als Liste */
+  SuS.ablageCsv = (liste) => {
+    const zeilen = [['Datum', 'Bereich', 'Titel', 'Notiz', 'Baustelle', 'Kunde'].map(csvFeld).join(';')];
+    liste.forEach((u) => {
+      const p = u.projektId ? SuS.projekt(u.projektId) : null, k = u.kundeId ? SuS.kunde(u.kundeId) : null;
+      zeilen.push([SuS.datum(u.datum), SuS.ABLAGE_ARTEN[u.art], u.titel, u.notiz, p ? p.nr + ' ' + p.titel : '', k ? k.name : ''].map(csvFeld).join(';'));
+    });
+    return '\ufeff' + zeilen.join('\r\n') + '\r\n';
+  };
   SuS.ausgabenCsv = (jahr, filter) => {
-    const zeilen = [['Datum', 'Lieferant', 'Belegnummer', 'Was', 'Art', 'Baustelle', 'Netto', 'USt-Satz', 'Vorsteuer', 'Brutto', 'Bezahlt'].map(csvFeld).join(';')];
+    const zeilen = [['Datum', 'Lieferant', 'Belegnummer', 'Belegart', 'Was', 'Art', 'Baustelle', 'Netto', 'USt-Satz', 'Vorsteuer', 'Brutto', 'Bezahlt'].map(csvFeld).join(';')];
     SuS.daten.ausgaben.filter((a) => (!jahr || a.datum.slice(0, 4) === String(jahr)) && (!filter || filter(a.datum))).sort((a, b) => a.datum.localeCompare(b.datum)).forEach((a) => {
       const p = a.projektId ? SuS.projekt(a.projektId) : null;
-      zeilen.push([SuS.datum(a.datum), a.lieferant, a.nummer, a.text, SuS.AUSGABE_ARTEN[a.art], p ? p.nr + ' ' + p.titel : '', centFeld(SuS.ausgabeNetto(a)),
+      zeilen.push([SuS.datum(a.datum), a.lieferant, a.nummer, SuS.BELEGARTEN[a.belegart] || '', a.text, SuS.AUSGABE_ARTEN[a.art], p ? p.nr + ' ' + p.titel : '', centFeld(SuS.ausgabeNetto(a)),
         String(a.satz), centFeld(SuS.ausgabeSteuer(a)), centFeld(a.brutto), a.bezahlt ? 'ja' : 'nein'].map(csvFeld).join(';'));
     });
     return '﻿' + zeilen.join('\r\n') + '\r\n';

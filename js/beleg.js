@@ -22,7 +22,7 @@
     material: /splitt|\bkies|\bsand\b|pflaster|beton|zement|m[oö]rtel|\berde\b|mulch|rasen|\bholz|schotter|stein|platte|kantenst|vlies|saatgut|d[uü]nger|pflanz|baustoff|fugen|sack|palette/i
   };
   const SUMME = [
-    [/zu\s*zahlen|zahlbetrag|endbetrag|gesamtbetrag/i, 5], [/\bsumme\b|\bgesamt\b|\btotal\b/i, 4], [/\bbetrag\b/i, 3],
+    [/zu\s*zahlen|zahlbetrag|endbetrag|gesamtbetrag|rechnungsbetrag|bruttobetrag|gesamt\s*brutto|endsumme|gutschriftsbetrag/i, 5], [/\bsumme\b|\bgesamt\b|\btotal\b/i, 4], [/\bbetrag\b/i, 3],
     [/ec[- ]?karte|girocard|kartenzahlung|maestro|visa|mastercard|\bbar\b|\bkarte\b/i, 2]
   ];
   const KEIN_BRUTTO = /netto|mwst|ust|steuer|r[uü]ckgeld|gegeben|wechselgeld|rabatt|pfand|\bnr\b|tel/i;
@@ -60,8 +60,13 @@
   function datumFinden(zeilen, heute) {
     const h = heute || isoHeute(), min = String(Number(h.slice(0, 4)) - 3) + h.slice(4);
     const max = new Date(new Date(h + 'T12:00:00Z').getTime() + 2 * 86400000).toISOString().slice(0, 10);
-    /* zuerst bei „Datum“ (auch über zwei Zeilen verteilt), dann überall */
-    for (let i = 0; i < zeilen.length; i++) if (/dat(um|e)/i.test(zeilen[i])) {
+    /* zuerst beim Rechnungs-/Belegdatum (Eingangsrechnungen nennen oft auch Liefer- und Fälligkeitsdatum), dann bei
+       „Datum“ (auch über zwei Zeilen verteilt), dann überall */
+    for (let i = 0; i < zeilen.length; i++) if (/(rechnungs|beleg|gutschrifts)-?\s?datum|datum\s+der\s+rechnung/i.test(zeilen[i])) {
+      const k = datumKandidaten(zeilen[i] + ' ' + (zeilen[i + 1] || ''), min, max);
+      if (k.length) return k[0];
+    }
+    for (let i = 0; i < zeilen.length; i++) if (/dat(um|e)/i.test(zeilen[i]) && !/(liefer|leistungs|f[aä]llig)/i.test(zeilen[i])) {
       const k = datumKandidaten(zeilen[i] + ' ' + (zeilen[i + 1] || ''), min, max);
       if (k.length) return k[0];
     }
@@ -169,8 +174,14 @@
 
   const GESCHAEFT = /kompostwerk|deponie|recycling|wertstoff|baustoff|bau-?\s?markt|gartenmarkt|markt\b|handel|gmbh|\bkg\b|\bag\b|tankstelle|station|niederlassung|agrar|abfall|entsorgung|werk\b/i;
   const KEIN_NAME = /kasse|beleg|rechnung|quittung|datum|uhrzeit|tel\b|telefon|www\.|@|str\.|stra(ss|ß)e|\b\d{5}\b|filiale|willkommen|kundenbeleg|steuer|bon|annahme|wiegeschein/i;
-  function lieferantFinden(zeilen) {
+  function lieferantFinden(zeilen, eigen) {
+    /* Die eigene Firma steht auf Eingangsrechnungen im Empfängerfeld – sie ist nie der Lieferant */
+    const eig = SuS.lieferantSchluessel(eigen);
+    const fremd = (z) => !eig || eig.length < 4 || !SuS.lieferantSchluessel(z).includes(eig);
+    zeilen = zeilen.filter(fremd);
     for (const [name, re, art] of KETTEN) if (zeilen.slice(0, 12).some((z) => re.test(z))) return { name, art, kette: true };
+    /* Absenderzeile über dem Anschriftfeld: „Firma GmbH · Straße 1 · 12345 Ort“ – nur der erste Teil */
+    zeilen = zeilen.map((z) => z.split(/\s[·•|]\s|\s[-–]\s(?=.*\d)/)[0].trim()).filter(Boolean);
     const kandidaten = zeilen.slice(0, 8).map((z, i) => {
       const buchst = (z.match(/[A-Za-zÄÖÜäöüß]/g) || []).length;
       if (buchst < 4 || buchst < z.length * 0.5 || !/[A-Za-zÄÖÜäöüß]{4,}/.test(z) || KEIN_NAME.test(z) && !GESCHAEFT.test(z)) return null;
@@ -184,13 +195,45 @@
 
   SuS.lieferantSchluessel = (name) => String(name || '').toLowerCase().replace(/[^a-z0-9äöüß]/g, '').slice(0, 40);
 
+  /* Belegart und Belegnummer aus dem Text (Vorschlag): '' = kein klarer Hinweis (die App nimmt dann Kassenbon beim Foto,
+     Eingangsrechnung bei PDF-Dateien); Kassenwörter ergeben „kassenbon“ – auch bei einem eingescannten Bon als PDF */
+  function belegartFinden(zeilen, gutschrift) {
+    const kopf = zeilen.slice(0, 30).join('\n');
+    if (gutschrift || /^\W*gutschrift\b/im.test(kopf)) return 'gutschrift';
+    if (/^\W*lieferschein\b/im.test(kopf) && !/^\W*rechnung\b/im.test(kopf)) return 'lieferschein';
+    if (/kassenbon|bon-?nr|\bkasse\s*:?\s*\d|kassierer|bar\s*gegeben|r[uü]ckgeld|ec-?karte|girocard/i.test(kopf + '\n' + zeilen.join('\n'))) return 'kassenbon';
+    if (/^\W*rechnung\b|rechnungs-?\s?(nummer|nr\b|nr\.|datum)|rechnung\s+nr\.?/im.test(kopf)) return 'eingangsrechnung';
+    return '';
+  }
+  function nummerFinden(zeilen) {
+    for (const z of zeilen.slice(0, 40)) {
+      const m = /(?:rechnungs|beleg|gutschrifts?|lieferschein)-?\s?(?:nummer|nr\.?)\s*:?\s*([A-Za-z0-9][A-Za-z0-9\-/.]{1,29})/i.exec(z) ||
+        /(?:^|\s)rechnung\s+nr\.?\s*:?\s*([A-Za-z0-9][A-Za-z0-9\-/.]{1,29})/i.exec(z);
+      if (m && /\d/.test(m[1]) && !/^\d{1,2}\.\d{1,2}\.\d{2,4}$/.test(m[1])) return m[1].replace(/[.\-/]+$/, '');
+    }
+    return '';
+  }
+
+  /* PDF-Text (pdf.js-Textstücke mit Position) zu Zeilen: gleiche Höhe = eine Zeile, links nach rechts; Seiten von oben nach unten */
+  SuS.pdfZeilen = (items) => {
+    const stuecke = (items || []).filter((x) => x && typeof x.str === 'string' && x.str.trim() && Array.isArray(x.transform))
+      .map((x) => ({ t: x.str.replace(/\s+/g, ' ').trim(), x: x.transform[4], y: x.transform[5], h: Math.max(1, Math.abs(x.height || x.transform[3] || 10)), w: Math.max(0, x.width || 0) }));
+    stuecke.sort((a, b) => b.y - a.y || a.x - b.x);
+    const zeilen = [];
+    for (const s of stuecke) {
+      const z = zeilen.length ? zeilen[zeilen.length - 1] : null;
+      if (z && Math.abs(z.y - s.y) <= 0.5 * Math.max(z.h, s.h)) z.teile.push(s); else zeilen.push({ y: s.y, h: s.h, teile: [s] });
+    }
+    return zeilen.map((z) => z.teile.sort((a, b) => a.x - b.x).map((s) => s.t).join(' ').replace(/\s+/g, ' ').trim()).filter(Boolean);
+  };
+
   /* Haupteinstieg: Text → Vorschläge. gelernt = { lieferantSchlüssel: art } (zuletzt bestätigte Kategorie je Lieferant). */
   SuS.belegLesen = (roh, gelernt, heute) => {
     const zeilen = String(roh || '').replace(/\r/g, '').split('\n').map((z) => z.replace(/[|]/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean);
     const datum = datumFinden(zeilen, heute);
     const b = bruttoFinden(zeilen);
     const st = steuerFinden(zeilen, b.wert, b.alle);
-    const l = lieferantFinden(zeilen);
+    const l = lieferantFinden(zeilen, SuS.daten && SuS.daten.firma && SuS.daten.firma.name);
     const text = zeilen.join('\n');
     let art = (gelernt && l.name && gelernt[SuS.lieferantSchluessel(l.name)]) || '';
     const artQuelle = art ? 'gelernt' : '';
@@ -206,7 +249,7 @@
     const vz = b.wert && (summenZeilen.some((z) => betraegeVz(z).includes(-b.wert)) || zeilen.some((z) => GUTSCHRIFT.test(z))) ? -1 : 1;
     const steuer = b.wert ? st.steuer : 0;
     return { datum, lieferant: l.name, brutto: vz * b.wert, satz: st.satz, steuer: vz * steuer, netto: vz * (b.wert - steuer),
-      art, gemischt: st.gemischt,
+      art, gemischt: st.gemischt, belegart: belegartFinden(zeilen, vz < 0), nummer: nummerFinden(zeilen),
       gutschrift: vz < 0, satzUnsicher: !!st.unsicher, keinAusweis: !!st.keinAusweis, sicher: { datum: !!datum, lieferant: l.kette, brutto: b.sicher, steuer: st.gefunden, satz: st.satzGefunden, art: !!artQuelle } };
   };
 

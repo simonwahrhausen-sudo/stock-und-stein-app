@@ -54,7 +54,7 @@
     SuS.blattZu();
     if (!document.getElementById('druck').hidden) SuS.schliesseDruck();
     const tab = { dok: 'belege', angebote: 'belege', rechnungen: 'belege', posten: 'belege', baustelle: 'baustellen', kunden: 'mehr', kunde: 'mehr', firma: 'mehr',
-      leistungen: 'mehr', sicherung: 'mehr', hilfe: 'mehr', mitarbeiter: 'mehr', vertraege: 'mehr', export: 'mehr', installieren: 'mehr' }[seite] || seite;
+      leistungen: 'mehr', sicherung: 'mehr', hilfe: 'mehr', mitarbeiter: 'mehr', vertraege: 'mehr', export: 'mehr', installieren: 'mehr', ausgaben: 'mehr', ablage: 'mehr' }[seite] || seite;
     if (seite !== 'baustelle') SuS.aktuelleBaustelle = null;
     document.querySelectorAll('.leiste a[data-tab]').forEach((a) => a.classList.toggle('aktiv', a.dataset.tab === tab));
     const f = SuS.seiten[seite];

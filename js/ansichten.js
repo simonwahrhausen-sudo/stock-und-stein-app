@@ -134,7 +134,8 @@
     SuS.zeige(
       '<section class="begruessung"><svg class="deko" viewBox="0 0 64 64"><rect x="4" y="40" width="46" height="16" rx="3" fill="#fff"/><path d="M14 38L52 8M36 21L52 24M26 29L28 15" stroke="#fff" stroke-width="4" stroke-linecap="round"/></svg>' +
       '<h1>' + gruss + '!</h1><p>' + e(f.name) + ' · Baustellen, Angebote, Rechnungen</p>' +
-      '<div class="knopfreihe" style="margin:0"><button class="knopf haupt" data-a="neu" data-typ="angebot">+ Angebot</button>' +
+      '<button class="knopf haupt breit gross beleg-knopf" data-a="belegErfassen">🧾 Beleg erfassen<small>Foto oder Datei/PDF – Kassenbon, Rechnung, Lieferschein, Vertrag</small></button>' +
+      '<div class="knopfreihe" style="margin:0"><button class="knopf zweit" data-a="neu" data-typ="angebot">+ Angebot</button>' +
       '<button class="knopf zweit" data-a="baustelleNeu">+ Baustelle</button></div></section>' +
       hinweise.join('') +
       (heute.length ? '<h2>Heute</h2><ul class="liste">' + heute.map(SuS.terminZeile).join('') + '</ul>' : '') +
@@ -314,7 +315,10 @@
       SuS.melde('Dieser Kunde hat Baustellen oder Pflegeverträge und bleibt deshalb erhalten.', true); return;
     }
     if (!SuS.sicher(el)) return;
-    if (!(await SuS.transaktionSicher(() => { SuS.daten.kunden = SuS.daten.kunden.filter((k) => k.id !== id); }))) {
+    if (!(await SuS.transaktionSicher(() => {
+      SuS.daten.kunden = SuS.daten.kunden.filter((k) => k.id !== id);
+      SuS.daten.ablage.forEach((u) => { if (u.kundeId === id) u.kundeId = ''; });  // Dokumente bleiben, nur ohne Kunde
+    }))) {
       SuS.melde('Speichern fehlgeschlagen – der Kunde bleibt.', true); return;  // Fund Cursor R13
     }
     SuS.blattZu(); SuS.melde('Kunde gelöscht.'); SuS.gehZu('#/kunden', marke);
@@ -328,7 +332,8 @@
       eintrag('#/kunden', 'Kunden', SuS.daten.kunden.length + ' Kunden') +
       eintrag('#/mitarbeiter', 'Mitarbeiter', SuS.daten.mitarbeiter.length + ' · für Stunden und Wochenplan') +
       eintrag('#/vertraege', 'Pflegeverträge', SuS.daten.vertraege.length + ' · wiederkehrende Rechnungen') +
-      eintrag('#/ausgaben', 'Ausgaben', SuS.daten.ausgaben.length + ' Belege · Material, Sprit, Kippe – mit Foto') +
+      eintrag('#/ausgaben', 'Ausgaben', SuS.daten.ausgaben.length + ' Belege · Material, Sprit, Kippe – mit Foto oder PDF') +
+      eintrag('#/ablage', 'Dokumente', SuS.daten.ablage.length + ' · Verträge, Versicherungen, Lieferscheine, Fahrzeug – durchsuchbar') +
       eintrag('#/export', 'Für den Steuerberater', 'Rechnungsausgangsbuch, Ausgaben, DATEV') +
       '<li><button class="zeile" data-a="eRechnungOeffnen"><div class="haupt"><div class="titel">Empfangene E-Rechnung ansehen</div><div class="klein">XRechnung oder ZUGFeRD-XML lesbar machen</div></div><span aria-hidden="true">›</span></button></li>' +
       eintrag('#/firma', 'Firmendaten', 'Anschrift, Steuernummer, Bank, Kleinunternehmer') +

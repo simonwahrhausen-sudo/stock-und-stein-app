@@ -121,7 +121,7 @@
     if (!window.crypto || !crypto.subtle) { SuS.melde('Verschlüsselung ist in diesem Browser nicht verfügbar.', true); return; }
     SuS.blatt('Verschlüsselte Sicherung', '<p class="unterzeile" style="margin-top:0">Die Sicherung wird mit einem Passwort verschlüsselt. Ohne Passwort kann niemand sie lesen – auch wir nicht. <b>Passwort gut aufschreiben</b>, sonst ist die Sicherung verloren. Tipp: mehrere Wörter, z. B. „Kies Hecke Mai 1974 Spaten“.</p>' +
       SuS.feld('p1', 'Passwort (mindestens 10 Zeichen)', '', { typ: 'password', auto: true, autocomplete: 'new-password' }) + SuS.feld('p2', 'Passwort wiederholen', '', { typ: 'password', autocomplete: 'new-password' }) +
-      '<label class="schalter"><input type="checkbox" name="fotos" checked><span><b>Fotos mitsichern</b><small>Größere Datei, dafür sind die Baustellenfotos nach einem Gerätewechsel wieder da.</small></span></label>',
+      '<label class="schalter"><input type="checkbox" name="fotos" checked><span><b>Fotos und Dateien mitsichern</b><small>Größere Datei, dafür sind Baustellenfotos, Belege und Dokumente (auch PDF) nach einem Gerätewechsel wieder da.</small></span></label>',
     async (fd, form) => {
       const p1 = String(fd.get('p1') || ''), p2 = String(fd.get('p2') || '');
       if (p1.length < 10) { SuS.melde('Bitte mindestens 10 Zeichen.', true); return false; }

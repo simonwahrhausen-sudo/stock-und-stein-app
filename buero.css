@@ -215,3 +215,16 @@ body.vollbild main { padding-bottom: calc(120px + var(--unten)); }
 .beleg-erkennung { margin: 8px 0 12px; }
 .beleg-status { margin: 6px 0; }
 .beleg-vorschau { display: block; max-width: 100%; max-height: 220px; margin: 6px auto; border-radius: 10px; }
+
+/* Belege und Dokumente überall sammeln (31.10.2026): großer Knopf auf der Startseite, Foto- und Dateiknopf nebeneinander, PDF-Kacheln */
+.knopf.gross { min-height: 58px; font-size: 17px; }
+.begruessung .beleg-knopf { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; margin: 0 0 10px; padding: 12px 14px; font-size: 18px; }
+.begruessung .beleg-knopf small { font-size: 12.5px; font-weight: 400; opacity: .8; }
+.datei-wahl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.datei-wahl .knopf { width: 100%; }
+.datei-liste { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+.datei-chip { display: inline-flex; align-items: center; gap: 4px; background: var(--moos-hell); color: var(--moos-dunkel); border-radius: 99px; padding: 3px 4px 3px 10px; font-size: 13px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.datei-chip button { border: 0; background: none; font-size: 17px; line-height: 1; padding: 0 6px; cursor: pointer; color: inherit; }
+.datei-kachel { display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 1; border-radius: 10px; background: #f3efe8; color: var(--stein); font-weight: 700; }
+.datei-marke { position: absolute; top: 5px; left: 5px; background: var(--rot); color: #fff; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px; }
+.pdf-seiten img { width: 100%; border-radius: 8px; margin-bottom: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.15); background: #fff; display: block; }

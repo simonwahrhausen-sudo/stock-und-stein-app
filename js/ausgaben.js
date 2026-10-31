@@ -25,7 +25,7 @@
         const kopf = m !== letzterMonat ? '<li class="unterzeile" style="padding:10px 14px 4px;list-style:none">' + SuS.MONATE[Number(m.slice(5)) - 1] + ' ' + m.slice(0, 4) + '</li>' : '';
         letzterMonat = m;
         return kopf + '<li><button class="zeile" data-a="ausgabeBearbeiten" data-id="' + e(a.id) + '"><div class="haupt"><div class="titel">' + e(a.lieferant || a.text || 'Ausgabe') + '</div><div class="klein">' +
-          e([SuS.datum(a.datum), SuS.AUSGABE_ARTEN[a.art], a.text && a.lieferant ? a.text : '', p ? p.titel : '', a.bezahlt ? '' : 'noch offen'].filter(Boolean).join(' · ')) +
+          e([SuS.datum(a.datum), a.belegart && a.belegart !== 'kassenbon' ? SuS.BELEGARTEN[a.belegart] : '', SuS.AUSGABE_ARTEN[a.art], a.text && a.lieferant ? a.text : '', p ? p.titel : '', a.bezahlt ? '' : 'noch offen'].filter(Boolean).join(' · ')) +
           '</div></div><div class="betrag">' + SuS.euro(a.brutto) + '</div></button></li>';
       }).join('') + '</ul>' : '<div class="karte leer"><p>Noch keine Ausgaben in ' + e(jahrA) + '. Tipp: Beleg gleich an der Kasse fotografieren.</p></div>') +
       '<div class="knopfreihe"><button class="knopf" data-a="steuerPaketBlatt">📦 Paket für den Steuerberater (ZIP)</button><button class="knopf" data-a="ausgabenCsv">Nur Liste (CSV)</button></div>' +
@@ -36,13 +36,18 @@
   A.ausgabeBearbeiten = (el) => {
     const alt = el.dataset.id ? SuS.daten.ausgaben.find((a) => a.id === el.dataset.id) : null;
     const x = alt || SuS.neueAusgabe(SuS.ausgabeVorgabe || { projektId: el.dataset.p || '' });
-    SuS.ausgabeVorgabe = null;
+    const vorDatei = alt ? null : SuS.ausgabeDatei;  // von „Beleg erfassen“ (Startseite) gewählte Datei
+    SuS.ausgabeVorgabe = null; SuS.ausgabeDatei = null;
+    if (!alt && !x.belegart) x.belegart = 'kassenbon';
     let form = null;
-    /* Neue Ausgabe: Fotoknopf zuerst – das Foto füllt die Felder darunter aus */
-    const fotoKasten = '<div class="beleg-erkennung"><label class="knopf haupt breit">📷 Beleg fotografieren – Felder werden ausgefüllt<input type="file" name="beleg" accept="image/*" capture="environment" hidden></label>' +
-      '<div class="beleg-status unterzeile" aria-live="polite">Oder unten von Hand eintragen.</div><img class="beleg-vorschau" alt="Beleg" hidden>' +
+    /* Neue Ausgabe: Foto- und Dateiknopf zuerst – Foto oder PDF füllen die Felder darunter aus */
+    const fotoKasten = '<div class="beleg-erkennung"><div class="datei-wahl"><label class="knopf haupt">📷 Beleg fotografieren<input type="file" name="beleg" accept="image/*" capture="environment" data-beleg-datei hidden></label>' +
+      '<label class="knopf">📄 Datei / PDF<input type="file" name="belegDatei" accept="image/*,application/pdf,.pdf" data-beleg-datei hidden></label></div>' +
+      '<div class="beleg-status unterzeile" aria-live="polite">Foto oder PDF füllt die Felder aus – oder unten von Hand eintragen.</div><img class="beleg-vorschau" alt="Beleg" hidden>' +
       '<button type="button" class="knopf klein beleg-drehen" hidden>↻ Bild drehen und neu erkennen</button></div>';
+    const belegarten = (x.belegart ? [] : [['', '– nicht angegeben –']]).concat(Object.entries(SuS.BELEGARTEN));
     form = SuS.blatt(alt ? 'Ausgabe' : 'Neue Ausgabe', (alt ? '' : fotoKasten) +
+      SuS.feld('belegart', 'Belegart', x.belegart, { typ: 'select', optionen: belegarten }) +
       '<div class="zwei">' + SuS.feld('datum', 'Datum', x.datum, { typ: 'date' }) + SuS.feld('brutto', 'Betrag brutto', x.brutto ? SuS.centText(x.brutto) : '', { dezimal: true, auto: false }) + '</div>' +
       SuS.feld('lieferant', 'Bei wem?', x.lieferant, { platz: 'z. B. Baustoffhandel, Tankstelle, Deponie' }) +
       SuS.feld('text', 'Was?', x.text, { platz: 'z. B. 6 t Splitt 2/5, Diesel, Grünschnitt' }) +
@@ -53,15 +58,20 @@
       SuS.feld('vorsteuer', 'Vorsteuer laut Beleg (leer = aus dem Satz)', x.vorsteuer != null ? SuS.centText(x.vorsteuer) : '', { dezimal: true, platz: 'automatisch' }) +
       (x.gemischt ? '<div class="hinweis">Vorsteuer weicht vom Satz ab (z. B. mehrere Steuersätze): im DATEV-Export nicht enthalten – bitte von Hand buchen.</div>' : '') +
       '<label class="schalter"><input type="checkbox" name="bezahlt"' + (x.bezahlt ? ' checked' : '') + '><span><b>Bezahlt</b><small>Aus, wenn die Rechnung noch überwiesen werden muss.</small></span></label>' +
-      (alt ? '<h3 style="margin:10px 0 6px">Belegfoto</h3><div id="fotos-a' + e(x.id) + '"><p class="unterzeile">Wird geladen …</p></div>' +
+      (alt ? '<h3 style="margin:10px 0 6px">Beleg (Foto oder PDF)</h3><div id="fotos-a' + e(x.id) + '" data-dateien><p class="unterzeile">Wird geladen …</p></div>' +
         '<button type="button" class="knopf gefahr breit" data-a="ausgabeLoeschen" data-id="' + e(x.id) + '">Ausgabe löschen</button>'
         : ''),
     async (fd) => {
-      const brutto = SuS.leseCent(fd.get('brutto'));
+      let brutto = SuS.leseCent(fd.get('brutto'));
       if (!Number.isFinite(brutto) || brutto === 0 || Math.abs(brutto) > 100000000) { SuS.melde('Bitte den Betrag eingeben (Gutschriften mit Minus).', true); return false; }
-      const vs = String(fd.get('vorsteuer') || '').trim() ? SuS.leseCent(fd.get('vorsteuer')) : null;
+      let vs = String(fd.get('vorsteuer') || '').trim() ? SuS.leseCent(fd.get('vorsteuer')) : null;
+      let belegart = String(fd.get('belegart') || '');
+      if (!Object.prototype.hasOwnProperty.call(SuS.BELEGARTEN, belegart)) belegart = '';
+      /* Gutschrift mindert die Ausgaben: positiv eingetragene Beträge bekommen ein Minus; ein Minusbetrag ohne Belegart ist eine Gutschrift */
+      if (belegart === 'gutschrift' && brutto > 0) { brutto = -brutto; if (vs != null && vs > 0) vs = -vs; }
+      if (brutto < 0 && !belegart) belegart = 'gutschrift';
       if (vs != null && (!Number.isFinite(vs) || Math.abs(vs) > Math.abs(brutto) || (vs !== 0 && Math.sign(vs) !== Math.sign(brutto)))) { SuS.melde('Vorsteuer passt nicht zum Betrag.', true); return false; }
-      const neuWerte = { datum: String(fd.get('datum') || SuS.heute()), brutto, lieferant: String(fd.get('lieferant') || '').trim().slice(0, 120),
+      const neuWerte = { belegart, datum: String(fd.get('datum') || SuS.heute()), brutto, lieferant: String(fd.get('lieferant') || '').trim().slice(0, 120),
         text: String(fd.get('text') || '').trim().slice(0, 200), art: String(fd.get('art')), satz: Number(fd.get('satz')), projektId: String(fd.get('projekt') || ''),
         nummer: String(fd.get('nummer') || '').trim().slice(0, 60), bezahlt: fd.get('bezahlt') === 'on', vorsteuer: vs };
       if (!neuWerte.lieferant && !neuWerte.text) { SuS.melde('Bitte angeben, bei wem oder was.', true); return false; }
@@ -76,27 +86,29 @@
         /* Lernen: zuletzt bestätigte Kategorie je Lieferant (für die nächste Beleg-Erkennung) */
         if (schluessel) { SuS.daten.lieferantArt = SuS.daten.lieferantArt || {}; SuS.daten.lieferantArt[schluessel] = neuWerte.art; }
       }))) { SuS.melde('Speichern fehlgeschlagen.', true); return false; }  // Foto erst danach (Fund Cursor R8)
-      const datei = fd.get('beleg');
-      if (datei && datei.size && SuS.fotoVerkleinern) {
-        /* Aufbereiteter, verkleinerter Ausschnitt aus der Erkennung, sonst das verkleinerte Originalfoto */
-        const gleich = (x, y) => x && y && x.name === y.name && x.size === y.size && x.lastModified === y.lastModified;  // FormData liefert ein neues Dateiobjekt
-        const bild = form.belegBild && gleich(form.belegBild.datei, datei) ? form.belegBild.blob : await SuS.fotoVerkleinern(datei);
-        try { await SuS.fotoSpeichern({ id: SuS.id(), projektId: 'a' + x.id, datum: x.datum, notiz: 'Beleg', bild }); }
-        catch (f) { SuS.melde('Ausgabe gespeichert, Foto nicht: ' + f.message, true); SuS.neuZeichnen(); return true; }
+      const datei = form.belegQuelle;
+      if (datei && datei.size && SuS.dateiAblegen) {
+        /* Foto: aufbereiteter, verkleinerter Ausschnitt aus der Erkennung, sonst das verkleinerte Originalfoto.
+           PDF: die Originaldatei mit Vorschaubild der ersten Seite. */
+        const aus = form.belegBild && form.belegBild.datei === datei ? form.belegBild : {};
+        try {
+          if (!(await SuS.fotosVerfuegbar())) throw new Error('Bildspeicher hier nicht verfügbar');
+          await SuS.dateiAblegen('a' + x.id, datei, { datum: x.datum, notiz: 'Beleg', bild: aus.blob || null, vorschau: aus.vorschau || null });
+        } catch (f) { SuS.melde('Ausgabe gespeichert, Beleg nicht: ' + f.message, true); SuS.neuZeichnen(); return true; }
       }
       SuS.melde('Ausgabe gespeichert.'); SuS.neuZeichnen(); return true;
     }, 'Sichern');
     if (alt && SuS.fotosZeichnen) setTimeout(() => SuS.fotosZeichnen('a' + x.id), 0);
-    if (!alt) belegErkennungAnbinden(form);
+    if (!alt) belegErkennungAnbinden(form, vorDatei);
   };
 
   /* ---------- Beleg-Erkennung im Formular (siehe beleg.js) ---------- */
-  function belegErkennungAnbinden(form) {
+  function belegErkennungAnbinden(form, vorDatei) {
     const kasten = form.querySelector('.beleg-erkennung');
-    if (!kasten || !SuS.belegErkennen) return;
-    const eingabe = kasten.querySelector('input[name="beleg"]'), status = kasten.querySelector('.beleg-status');
+    if (!kasten) return;
+    const status = kasten.querySelector('.beleg-status');
     const vorschau = kasten.querySelector('.beleg-vorschau'), drehen = kasten.querySelector('.beleg-drehen');
-    const FELDER = ['datum', 'brutto', 'lieferant', 'art', 'satz', 'vorsteuer'];
+    const FELDER = ['datum', 'brutto', 'lieferant', 'art', 'satz', 'vorsteuer', 'belegart', 'nummer'];
     const feld = (name) => form.querySelector('[name="' + name + '"]');
     const anfang = Object.fromEntries(FELDER.map((n) => [n, feld(n) ? feld(n).value : '']));
     let drehung = 0, laeuft = false, nochmal = null, lauf = 0, vorschauUrl = '';
@@ -118,8 +130,9 @@
     form.addEventListener('focusin', (ev) => { const l = ev.target.closest('.feld.vorschlag'); if (l) l.classList.remove('vorschlag'); });
     form.addEventListener('change', (ev) => { const l = ev.target.closest('.feld.vorschlag'); if (l) l.classList.remove('vorschlag'); });
     const erkennen = async (dr) => {
-      const datei = eingabe.files && eingabe.files[0];
+      const datei = form.belegQuelle;
       if (!datei) return;
+      if (!SuS.belegAusDatei) { status.textContent = 'Datei gewählt – bitte die Felder von Hand ausfüllen.'; return; }
       if (laeuft) { nochmal = { dr }; return; }  // neueste Auswahl nach dem laufenden Durchgang erkennen (Fund Codex)
       const meinLauf = ++lauf;
       laeuft = true; drehen.hidden = true;
@@ -129,14 +142,17 @@
         else if (m && /load/.test(m.status || '')) status.textContent = 'Texterkennung wird geladen …';
       };
       try {
-        const r = await SuS.belegErkennen(datei, dr);
-        if (meinLauf !== lauf || eingabe.files[0] !== datei || nochmal) return;  // inzwischen anderes Foto gewählt: Ergebnis verwerfen
+        const r = await SuS.belegAusDatei(datei, dr);
+        if (meinLauf !== lauf || form.belegQuelle !== datei || nochmal) return;  // inzwischen anderes Foto gewählt: Ergebnis verwerfen
         drehung = r.drehung;
         zuruecksetzen();
-        form.belegBild = { datei, blob: r.bild.speicher };
+        form.belegBild = { datei, blob: r.pdf ? null : r.bild.speicher, vorschau: r.pdf ? r.vorschau : null, textPdf: !!r.textPdf };
         if (vorschauUrl) URL.revokeObjectURL(vorschauUrl);
-        vorschauUrl = URL.createObjectURL(r.bild.speicher); vorschau.src = vorschauUrl; vorschau.hidden = false;
+        const zeigeBild = r.pdf ? r.vorschau : r.bild.speicher;
+        if (zeigeBild) { vorschauUrl = URL.createObjectURL(zeigeBild); vorschau.src = vorschauUrl; vorschau.hidden = false; } else { vorschauUrl = ''; vorschau.hidden = true; }
         const v = r.vorschlag;
+        vorschlagen('belegart', v.belegart || (r.pdf ? 'eingangsrechnung' : 'kassenbon'));
+        vorschlagen('nummer', v.nummer);
         vorschlagen('datum', v.datum);
         if (v.brutto) vorschlagen('brutto', SuS.centText(v.brutto));
         vorschlagen('lieferant', v.lieferant);
@@ -148,7 +164,8 @@
         if (v.brutto && v.sicher.satz && (v.gemischt || Math.abs(v.steuer - Math.round(v.brutto * v.satz / (100 + v.satz))) > 2)) vorschlagen('vorsteuer', SuS.centText(v.steuer));
         form.belegGemischt = !!v.gemischt;
         const fehlt = [v.datum ? '' : 'Datum', v.brutto ? '' : 'Betrag', v.lieferant ? '' : 'Lieferant', v.sicher.satz || v.keinAusweis ? '' : 'Steuersatz'].filter(Boolean);
-        status.innerHTML = '<b>Gelb = Vorschlag aus dem Foto.</b> Bitte prüfen – antippen bestätigt, Speichern übernimmt alles.' +
+        status.innerHTML = '<b>Gelb = Vorschlag aus ' + (r.pdf ? (r.textPdf ? 'dem PDF' : 'dem eingescannten PDF (Seite 1)') : 'dem Foto') + '.</b> Bitte prüfen – antippen bestätigt, Speichern übernimmt alles.' +
+          (r.seiten > 1 ? ' Das PDF hat ' + r.seiten + ' Seiten.' : '') +
           (v.brutto && v.sicher.satz ? ' Netto ' + SuS.euro(v.netto) + ' + MwSt ' + (v.gemischt ? '(mehrere Sätze) ' : v.satz + ' % ') + SuS.euro(v.steuer) + '.' : '') +
           (v.gutschrift ? ' Gutschrift erkannt (Beträge mit Minus).' : '') +
           (v.sicher.satz && v.satzUnsicher ? ' Steuersatz nicht sicher lesbar – 19 % angenommen, bitte prüfen.' : '') +
@@ -156,14 +173,17 @@
           (v.gemischt ? ' Mehrere Steuersätze: Vorsteuer laut Beleg, bitte im DATEV-Export von Hand buchen.' : '') +
           (fehlt.length ? ' Nicht erkannt: ' + fehlt.join(', ') + ' – bitte selbst eintragen.' : '');
       } catch (x) {
-        if (meinLauf === lauf) status.textContent = 'Erkennung nicht möglich (' + x.message + '). Bitte von Hand ausfüllen – das Foto wird trotzdem gespeichert.';
+        if (meinLauf === lauf) status.textContent = 'Erkennung nicht möglich (' + x.message + '). Bitte von Hand ausfüllen – ' + (/größer als 10 MB/.test(x.message) ? 'die Datei kann so nicht gespeichert werden.' : 'der Beleg wird trotzdem gespeichert.');
       } finally {
-        laeuft = false; drehen.hidden = false; SuS.belegFortschritt = null;
+        laeuft = false; SuS.belegFortschritt = null;
+        drehen.hidden = !!(form.belegBild && form.belegBild.textPdf);  // ein PDF mit Text muss nicht gedreht werden
         if (nochmal) { const n = nochmal; nochmal = null; erkennen(n.dr); }
       }
     };
-    eingabe.addEventListener('change', () => { drehung = 0; form.belegBild = null; erkennen(); });
+    const gewaehlt = (datei) => { form.belegQuelle = datei; drehung = 0; form.belegBild = null; erkennen(); };
+    kasten.querySelectorAll('[data-beleg-datei]').forEach((inp) => inp.addEventListener('change', () => { if (inp.files && inp.files[0]) gewaehlt(inp.files[0]); }));
     drehen.addEventListener('click', () => erkennen((drehung + 90) % 360));
+    if (vorDatei) gewaehlt(vorDatei);
   }
   A.ausgabeLoeschen = async (el) => {
     if (!SuS.sicher(el)) return;
@@ -200,7 +220,7 @@
     SuS.ausgabeVorgabe = { lieferant: (r.verkaeufer && r.verkaeufer.name || '').slice(0, 120), nummer: String(r.nummer || '').slice(0, 60),
       text: (r.positionen[0] ? r.positionen[0].text : 'E-Rechnung').slice(0, 200) + (r.positionen.length > 1 ? ' u. a.' : ''),
       brutto: Number.isFinite(brutto) ? vz * brutto : 0, satz, vorsteuer: Number.isFinite(steuer) ? vz * steuer : null, gemischt,
-      datum: iso ? iso[3] + '-' + iso[2] + '-' + iso[1] : SuS.heute(), bezahlt: false, art: 'material' };
+      datum: iso ? iso[3] + '-' + iso[2] + '-' + iso[1] : SuS.heute(), bezahlt: false, art: 'material', belegart: vz < 0 ? 'gutschrift' : 'eingangsrechnung' };
     A.ausgabeBearbeiten({ dataset: {} });
   };
 })();

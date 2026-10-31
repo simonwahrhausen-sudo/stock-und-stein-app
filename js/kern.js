@@ -120,6 +120,7 @@ SuS.leer = () => ({
   dokumente: [],
   /* Ausbau (Orientierung an Branchen-Software, siehe ORIENTIERUNG.md) */
   projekte: [], aufwand: [], termine: [], mitarbeiter: [], vertraege: [], vorlagen: [], ausgaben: [], bausteine: [],
+  ablage: [],  /* Dokumente ohne Betrag (Vertrag, Versicherung, Lieferschein …); Dateien liegen im Bildspeicher unter „u“ + id */
   zaehler: {},
   lieferantArt: {}  /* Beleg-Erkennung: zuletzt bestätigte Kategorie je Lieferant */
 });
@@ -139,7 +140,7 @@ SuS.laden = (roh) => {
   }
   const leer = SuS.leer();
   d.firma = Object.assign(leer.firma, d.firma || {});
-  ['kunden', 'leistungen', 'dokumente', 'projekte', 'aufwand', 'termine', 'mitarbeiter', 'vertraege', 'vorlagen', 'ausgaben', 'bausteine'].forEach((k) => { if (!Array.isArray(d[k])) d[k] = []; });
+  ['kunden', 'leistungen', 'dokumente', 'projekte', 'aufwand', 'termine', 'mitarbeiter', 'vertraege', 'vorlagen', 'ausgaben', 'bausteine', 'ablage'].forEach((k) => { if (!Array.isArray(d[k])) d[k] = []; });
   if (!d.zaehler || typeof d.zaehler !== 'object' || Array.isArray(d.zaehler)) d.zaehler = {};
   if (!d.lieferantArt || typeof d.lieferantArt !== 'object' || Array.isArray(d.lieferantArt)) d.lieferantArt = {};
   for (const k of Object.keys(d.lieferantArt)) if (!/^[a-z0-9äöüß]{1,40}$/.test(k) || !Object.prototype.hasOwnProperty.call(SuS.AUSGABE_ARTEN, d.lieferantArt[k])) delete d.lieferantArt[k];
@@ -273,7 +274,11 @@ SuS.bereinige = (d) => {
     nummer: text(a.nummer).slice(0, 60), text: text(a.text).slice(0, 200), brutto: Math.max(-100000000, Math.min(100000000, Math.round(zahl(a.brutto, 0)))),
     satz: [19, 7, 0].includes(Number(a.satz)) ? Number(a.satz) : 19, art: Object.prototype.hasOwnProperty.call(SuS.AUSGABE_ARTEN, a.art) ? a.art : 'material',
     projektId: id(a.projektId, true), bezahlt: a.bezahlt !== false,
-    vorsteuer: a.vorsteuer == null || a.vorsteuer === '' || !Number.isFinite(Number(a.vorsteuer)) ? null : Math.max(-100000000, Math.min(100000000, Math.round(Number(a.vorsteuer)))), gemischt: a.gemischt === true }, a));
+    vorsteuer: a.vorsteuer == null || a.vorsteuer === '' || !Number.isFinite(Number(a.vorsteuer)) ? null : Math.max(-100000000, Math.min(100000000, Math.round(Number(a.vorsteuer)))), gemischt: a.gemischt === true,
+    belegart: Object.prototype.hasOwnProperty.call(SuS.BELEGARTEN, a.belegart) ? a.belegart : '' }, a));
+  d.ablage = obj(d.ablage).slice(0, 20000).map((u) => ({ id: id(u.id), titel: text(u.titel).trim().slice(0, 120) || 'Dokument',
+    art: Object.prototype.hasOwnProperty.call(SuS.ABLAGE_ARTEN, u.art) ? u.art : 'sonstiges', datum: datum(u.datum) || SuS.heute(), notiz: text(u.notiz).slice(0, 1000),
+    projektId: id(u.projektId, true), kundeId: id(u.kundeId, true), suchtext: text(u.suchtext).slice(0, 1500) }));
   d.vorlagen = obj(d.vorlagen).slice(0, 100).map((v) => ({ id: id(v.id), name: text(v.name).slice(0, 80) || 'Vorlage', positionen: obj(v.positionen).slice(0, 300).map(position) }));
   const f = d.firma;
   Object.keys(f).forEach((k) => { if (typeof f[k] !== 'boolean' && typeof f[k] !== 'number') f[k] = text(f[k]); });
@@ -474,6 +479,9 @@ SuS.leistung = (id) => SuS.daten.leistungen.find((l) => l.id === id) || null;
 /* Arten von Ausgaben (Eingangsbelege) */
 SuS.AUSGABE_ARTEN = { material: 'Material', maschinen: 'Maschinen/Miete', fahrzeug: 'Fahrzeug/Sprit', entsorgung: 'Entsorgung/Kippe',
   fremd: 'Fremdleistung', werkzeug: 'Werkzeug/Kleingerät', buero: 'Büro/Telefon/Versicherung', sonstiges: 'Sonstiges' };
+/* Belegart einer Ausgabe ('' = nicht angegeben, ältere Einträge) und Bereiche der Dokumenten-Ablage (Auftrag Simon 31.10.2026) */
+SuS.BELEGARTEN = { kassenbon: 'Kassenbon', eingangsrechnung: 'Eingangsrechnung', gutschrift: 'Gutschrift', lieferschein: 'Lieferschein', sonstiges: 'Sonstiges' };
+SuS.ABLAGE_ARTEN = { vertrag: 'Vertrag', versicherung: 'Versicherung', lieferschein: 'Lieferschein', fahrzeug: 'Fahrzeug', sonstiges: 'Sonstiges' };
 
 SuS.ARTEN = {
   lohn: { name: 'Arbeit', lohn: 100 },
