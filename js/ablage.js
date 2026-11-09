@@ -92,13 +92,12 @@
 
   /* ---------------- Startseite: „Beleg erfassen“ ---------------- */
   A.belegErfassen = () => {
-    SuS.blatt('Beleg erfassen',
-      '<p class="unterzeile" style="margin-top:0">Foto aufnehmen oder Datei wählen – z. B. die PDF-Rechnung aus der Mail. Alles bleibt auf diesem Gerät.</p>' +
-      '<div class="feld"><span>Was ist es?</span>' +
-      '<label class="schalter"><input type="radio" name="ziel" value="ausgabe" checked><span><b>Ausgabe mit Betrag</b><small>Kassenbon, Eingangsrechnung, Gutschrift – Felder werden ausgefüllt</small></span></label>' +
-      '<label class="schalter"><input type="radio" name="ziel" value="dokument"><span><b>Dokument ohne Betrag</b><small>Lieferschein, Vertrag, Versicherung, Fahrzeug, Sonstiges</small></span></label></div>' +
+    SuS.blatt('Zettel fotografieren',
+      '<div class="feld"><span>Was ist das für ein Zettel?</span>' +
+      '<label class="schalter"><input type="radio" name="ziel" value="ausgabe" checked><span><b>Ich habe etwas bezahlt</b><small>Kassenbon, Rechnung vom Händler. Die App liest den Betrag selbst.</small></span></label>' +
+      '<label class="schalter"><input type="radio" name="ziel" value="dokument"><span><b>Anderes Papier</b><small>Lieferschein, Vertrag, Versicherung, Auto</small></span></label></div>' +
       '<label class="knopf haupt breit gross">📷 Foto aufnehmen<input type="file" accept="image/*" capture="environment" data-erfassen hidden></label>' +
-      '<label class="knopf breit gross">📄 Datei oder PDF wählen<input type="file" accept="image/*,application/pdf,.pdf" data-erfassen hidden></label>');
+      '<label class="knopf breit gross">📄 Datei vom Handy nehmen<input type="file" accept="image/*,application/pdf,.pdf" data-erfassen hidden></label>');
   };
   document.addEventListener('change', (ev) => {
     const el = ev.target.closest('[data-erfassen]');
@@ -124,7 +123,7 @@
   SuS.seiten.ablage = () => {
     const q = SuS.ansicht.suche, liste = SuS.ablageSuchen(q, artFilter);
     const zahl = (k) => SuS.daten.ablage.filter((u) => k === 'alle' || u.art === k).length;
-    SuS.zeige('<button class="zurueck" data-a="zurueck" data-ziel="#/mehr">‹ Mehr</button><div class="kopf"><div><h1>Dokumente</h1><p>Unterlagen ohne Betrag</p></div>' +
+    SuS.zeige('<button class="zurueck" data-a="zurueck" data-ziel="#/mehr">‹ Mehr</button><div class="kopf"><div><h1>Papiere</h1><p>Unterlagen ohne Betrag</p></div>' +
       '<button class="knopf haupt klein" data-a="ablageBearbeiten">+ Neu</button></div>' +
       '<input class="suche" type="search" placeholder="Suchen: Titel, Notiz, Kunde, Baustelle" value="' + e(q) + '" data-suche>' +
       '<div class="filter">' + [['alle', 'Alle']].concat(Object.entries(SuS.ABLAGE_ARTEN)).map(([k, t]) =>

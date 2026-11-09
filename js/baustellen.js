@@ -62,28 +62,28 @@
     SuS.zeige('<button class="zurueck" data-a="zurueck" data-ziel="#/baustellen">‹ Baustellen</button>' +
       '<div class="dokkopf"><div><h1>' + e(p.titel) + '</h1><div class="unterzeile">' + e(p.nr) + '</div></div>' + statusChip(p.status) + '</div>' +
       '<div class="karte" style="margin-top:14px"><div class="drei" style="text-align:center">' +
-        '<div><div class="kachel-wert">' + belege.length + '</div><div class="unterzeile">Belege</div></div>' +
+        '<div><div class="kachel-wert">' + belege.length + '</div><div class="unterzeile">Papiere</div></div>' +
         '<div><div class="kachel-wert">' + SuS.zahl(stunden, 1) + '</div><div class="unterzeile">Stunden</div></div>' +
         '<div><div class="kachel-wert"' + (offen.length ? ' style="color:var(--gelb)"' : '') + '>' + offen.length + '</div><div class="unterzeile">nicht abgerechnet</div></div></div></div>' +
       '<div class="knopfreihe"><button class="knopf haupt" data-a="zeitNeu" data-p="' + e(p.id) + '">+ Stunden</button><button class="knopf zweit" data-a="materialNeu" data-p="' + e(p.id) + '">+ Material</button>' +
       '<button class="knopf" data-a="terminNeu" data-p="' + e(p.id) + '">+ Termin</button></div>' +
-      '<h2>Angaben</h2><div class="karte">' +
-        SuS.feld('titel', 'Bezeichnung', p.titel, {}) .replace('name="titel"', 'name="titel" data-pfeld="titel"') +
+      '<h2>Infos zur Baustelle</h2><div class="karte">' +
+        SuS.feld('titel', 'Name der Baustelle', p.titel, {}) .replace('name="titel"', 'name="titel" data-pfeld="titel"') +
         SuS.feld('kunde', 'Kunde', p.kundeId, { typ: 'select', optionen: [['', '– kein Kunde –']].concat(SuS.daten.kunden.slice().sort((a, b) => a.name.localeCompare(b.name, 'de')).map((x) => [x.id, x.name])) }).replace('name="kunde"', 'name="kunde" data-pfeld="kundeId"') +
         SuS.feld('adresse', 'Adresse der Baustelle', p.adresse, {}).replace('name="adresse"', 'name="adresse" data-pfeld="adresse"') +
         SuS.feld('status', 'Stand', p.status, { typ: 'select', optionen: Object.keys(SuS.PSTATUS).map((s) => [s, SuS.PSTATUS[s]]) }).replace('name="status"', 'name="status" data-pfeld="status"') +
         (k && k.telefon ? '<a class="knopf klein" href="tel:' + e(k.telefon.replace(/[^\d+]/g, '')) + '">Kunde anrufen</a> ' : '') +
         (p.adresse && window.parent === window ? '<a class="knopf klein" href="https://maps.apple.com/?q=' + encodeURIComponent(p.adresse) + '" target="_blank" rel="noopener">Route</a>' : '') +
       '</div>' +
-      '<h2>Belege</h2>' + (belege.length ? '<ul class="liste">' + belege.map(SuS.dokZeile).join('') + '</ul>' : '<p class="unterzeile">Noch keine.</p>') +
+      '<h2>Angebote & Rechnungen</h2>' + (belege.length ? '<ul class="liste">' + belege.map(SuS.dokZeile).join('') + '</ul>' : '<p class="unterzeile">Noch keine.</p>') +
       '<div class="knopfreihe"><button class="knopf" data-a="belegFuerBaustelle" data-typ="angebot" data-p="' + e(p.id) + '">+ Angebot</button>' +
       '<button class="knopf" data-a="belegFuerBaustelle" data-typ="rechnung" data-p="' + e(p.id) + '">+ Rechnung</button></div>' +
       '<h2>Stunden und Material</h2>' +
-      (offen.length ? '<div class="hinweis info"><b>' + offen.length + ' Einträge noch nicht abgerechnet.</b><div class="knopfreihe"><button class="knopf haupt klein" data-a="aufwandAbrechnen" data-p="' + e(p.id) + '">In Rechnung übernehmen</button></div></div>' : '') +
+      (offen.length ? '<div class="hinweis info"><b>' + offen.length + ' Einträge noch nicht abgerechnet.</b><div class="knopfreihe"><button class="knopf haupt klein" data-a="aufwandAbrechnen" data-p="' + e(p.id) + '">Jetzt abrechnen</button></div></div>' : '') +
       (aufwand.length ? '<ul class="liste">' + aufwand.map(zeileAufwand).join('') + '</ul>' : '<p class="unterzeile">Noch nichts erfasst. Stunden und Material lassen sich später mit einem Tipp abrechnen.</p>') +
-      nachkalkulationKarte(p.id) +
+      '<details class="selten"><summary>Für Profis: Rechnet sich die Baustelle?</summary>' + nachkalkulationKarte(p.id) +
       '<div class="knopfreihe"><button class="knopf klein" data-a="stundenSenden" data-p="' + e(p.id) + '">Stunden als Datei senden</button>' +
-      '<label class="knopf klein">Stunden-Datei einlesen<input type="file" accept=".json,application/json" data-stundendatei="' + e(p.id) + '" hidden></label></div>' +
+      '<label class="knopf klein">Stunden-Datei einlesen<input type="file" accept=".json,application/json" data-stundendatei="' + e(p.id) + '" hidden></label></div></details>' +
       '<h2>Fotos</h2><div id="fotos-' + e(p.id) + '"><p class="unterzeile">Fotos werden geladen …</p></div>' +
       '<h2>Termine</h2>' + (termine.length ? '<ul class="liste">' + termine.map(terminZeile).join('') + '</ul>' : '<p class="unterzeile">Keine Termine.</p>') +
       '<h2>Notizen</h2><div class="karte"><label class="feld"><span>Nur intern (Zugang, Absprachen, Maße …)</span><textarea data-pfeld="notiz" style="min-height:110px">' + e(p.notiz) + '</textarea></label></div>' +

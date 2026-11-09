@@ -91,8 +91,8 @@
 
   SuS.dokZeile = dokZeile;
   /* Reiter über den Belegen: Angebote · Rechnungen · Offene Posten */
-  SuS.belegReiter = (aktiv) => '<div class="kopf"><h1>Belege</h1>' + (aktiv === 'posten' ? '' : '<button class="knopf haupt klein" data-a="neu" data-typ="' + (aktiv === 'angebote' ? 'angebot' : 'rechnung') + '">+ Neu</button>') + '</div>' +
-    '<div class="segment">' + [['angebote', 'Angebote'], ['rechnungen', 'Rechnungen'], ['posten', 'Offene Posten']].map(([k, t]) =>
+  SuS.belegReiter = (aktiv) => '<div class="kopf"><h1>Angebote & Rechnungen</h1>' + (aktiv === 'posten' ? '' : '<button class="knopf haupt klein" data-a="neu" data-typ="' + (aktiv === 'angebote' ? 'angebot' : 'rechnung') + '">+ Neu</button>') + '</div>' +
+    '<div class="segment">' + [['angebote', 'Angebote'], ['rechnungen', 'Rechnungen'], ['posten', 'Unbezahlt']].map(([k, t]) =>
       '<button type="button" data-a="zurueck" data-ziel="#/' + k + '" class="' + (k === aktiv ? 'an' : '') + '">' + t + '</button>').join('') + '</div>';
 
   /* ---------- Start ---------- */
@@ -113,16 +113,16 @@
     const hinweise = [];
     if (SuS.keinSpeicher) hinweise.push('<div class="hinweis fehler"><b>Achtung: Daten werden nicht gespeichert</b>Dieser Browser erlaubt der App keinen Speicher. Bitte die App über den Orchestrator oder als eigene Seite öffnen und vor dem Schließen eine Datensicherung als Text machen.</div>');
     if (!f.strasse || !f.iban || (!f.steuernummer && !f.ustid)) {
-      hinweise.push('<div class="hinweis"><b>Firmendaten fehlen noch</b>Anschrift, Steuernummer und Bankverbindung eintragen – sonst stehen rote Platzhalter auf dem Ausdruck. <a href="#/firma">Jetzt eintragen</a></div>');
+      hinweise.push('<div class="hinweis"><b>Bitte einmal Ihre Firma eintragen</b>Adresse, Steuernummer und Konto. Das steht dann auf jeder Rechnung. <a class="knopf haupt klein" href="#/firma">Jetzt eintragen</a></div>');
     }
     /* Erinnerung an die Datensicherung: Daten liegen nur auf diesem Gerät (Fund der unbeteiligten Bewertung). */
     const echte = d.dokumente.filter((x) => !x.beispiel).length;
     const tage = d.letzteSicherung ? Math.floor((Date.now() - Date.parse(d.letzteSicherung)) / 86400000) : null;
     if (echte && (tage == null || tage >= 7)) {
-      hinweise.push('<div class="hinweis"><b>' + (tage == null ? 'Noch keine Datensicherung' : 'Letzte Datensicherung vor ' + tage + ' Tagen') + '</b>Ihre Angebote und Rechnungen liegen nur auf diesem Gerät. <a href="#/sicherung">Jetzt sichern</a></div>');
+      hinweise.push('<div class="hinweis"><b>' + (tage == null ? 'Noch keine Datensicherung' : 'Letzte Datensicherung vor ' + tage + ' Tagen') + '</b>Alles liegt nur auf diesem Handy. Geht es kaputt, ist alles weg. <a class="knopf haupt klein" href="#/sicherung">Jetzt sichern</a></div>');
     }
     if (!f.preiseGeprueft) {
-      hinweise.push('<div class="hinweis info"><b>Richtwerte statt eigener Preise</b>Der Leistungskatalog enthält Richtwerte für den Raum Hildesheim. Bitte einmal durchgehen und eigene Preise eintragen. <a href="#/leistungen">Preise ansehen</a></div>');
+      hinweise.push('<div class="hinweis info"><b>Bitte Ihre Preise prüfen</b>Die Preise sind erst nur geschätzt. Einmal durchsehen und anpassen. <a class="knopf haupt klein" href="#/leistungen">Preise ansehen</a></div>');
     }
     const heute = SuS.daten.termine.filter((t) => t.datum === SuS.heute()).sort((a, b) => (a.von || '').localeCompare(b.von || ''));
     const nachfassen = SuS.nachfassen();
@@ -131,25 +131,40 @@
     const vertraege = SuS.faelligeVertraege();
     if (vertraege.length) hinweise.push('<div class="hinweis info"><b>' + vertraege.length + ' Pflegerechnung(en) fällig</b><a href="#/vertraege">Entwürfe erstellen</a></div>');
     const zuletzt = d.dokumente.slice().sort((a, b) => (b.geaendert || b.erstellt || '').localeCompare(a.geaendert || a.erstellt || '')).slice(0, 5);
+    /* Einfach-Modus (08.11.): vier große Knöpfe zuerst, nur EIN Hinweis auf einmal, Zahlen darunter. */
+    const ICON = {
+      angebot: '<svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5"/></svg>',
+      rechnung: '<svg viewBox="0 0 24 24"><path d="M12 6v12M15 9.5c0-1.4-1.3-2.5-3-2.5s-3 1-3 2.3c0 3.2 6 1.8 6 5 0 1.4-1.3 2.4-3 2.4s-3-1-3-2.5"/><circle cx="12" cy="12" r="9.5"/></svg>',
+      foto: '<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+      baustelle: '<svg viewBox="0 0 24 24"><path d="M3 20h18M5 20V10l7-5 7 5v10M10 20v-5h4v5"/></svg>'
+    };
+    const gross = (a, typ, icon, titel, text) => '<button type="button" class="riesenknopf" data-a="' + a + '"' + (typ ? ' data-typ="' + typ + '"' : '') + '>' +
+      '<span class="symbol" aria-hidden="true">' + ICON[icon] + '</span><b>' + titel + '</b><small>' + text + '</small></button>';
     SuS.zeige(
-      '<section class="begruessung"><svg class="deko" viewBox="0 0 64 64"><rect x="4" y="40" width="46" height="16" rx="3" fill="#fff"/><path d="M14 38L52 8M36 21L52 24M26 29L28 15" stroke="#fff" stroke-width="4" stroke-linecap="round"/></svg>' +
-      '<h1>' + gruss + '!</h1><p>' + e(f.name) + ' · Baustellen, Angebote, Rechnungen</p>' +
-      '<button class="knopf haupt breit gross beleg-knopf" data-a="belegErfassen">🧾 Beleg erfassen<small>Foto oder Datei/PDF – Kassenbon, Rechnung, Lieferschein, Vertrag</small></button>' +
-      '<div class="knopfreihe" style="margin:0"><button class="knopf zweit" data-a="neu" data-typ="angebot">+ Angebot</button>' +
-      '<button class="knopf zweit" data-a="baustelleNeu">+ Baustelle</button></div></section>' +
-      hinweise.join('') +
+      '<section class="einfach-kopf"><h1>' + gruss + '!</h1><p>Was möchten Sie tun?</p></section>' +
+      '<button type="button" class="sprechknopf" data-a="sprechen"><span aria-hidden="true">🎤</span><b>Sprechen</b><small>Einfach sagen, was Sie wollen</small></button>' +
+      '<div class="riesenknoepfe">' +
+        gross('neu', 'angebot', 'angebot', 'Angebot schreiben', 'Preis für den Kunden') +
+        gross('neu', 'rechnung', 'rechnung', 'Rechnung schreiben', 'Geld verlangen') +
+        gross('belegErfassen', '', 'foto', 'Zettel fotografieren', 'Kassenbon, Lieferschein …') +
+        gross('baustelleNeu', '', 'baustelle', 'Neue Baustelle', 'Auftrag anlegen') +
+      '</div>' +
+      '<button type="button" class="knopf breit gross" data-a="anrufMerken">📞 Anruf merken</button>' +
+      (hinweise.length ? hinweise[0] : '') +
       (heute.length ? '<h2>Heute</h2><ul class="liste">' + heute.map(SuS.terminZeile).join('') + '</ul>' : '') +
-      '<div class="kacheln">' +
-        '<a class="kachel" href="#/angebote" data-filter="versendet"><div class="name">Offene Angebote (' + offenA.length + ')</div><div class="wert">' + SuS.euro(summe(offenA)) + '</div></a>' +
-        '<a class="kachel" href="#/posten"><div class="name">Offene Rechnungen (' + offenR.length + ')</div><div class="wert">' + SuS.euro(offenR.reduce((a, x) => a + SuS.offenerBetrag(x), 0)) + '</div></a>' +
-        '<a class="kachel' + (ueber.length ? ' warn' : '') + '" href="#/posten"><div class="name">Überfällig (' + ueber.length + ')</div><div class="wert">' + SuS.euro(ueber.reduce((a, x) => a + SuS.offenerBetrag(x), 0)) + '</div></a>' +
+      '<h2>Geld im Blick</h2><div class="kacheln">' +
+        '<a class="kachel" href="#/angebote" data-filter="versendet"><div class="name">Angebote ohne Antwort (' + offenA.length + ')</div><div class="wert">' + SuS.euro(summe(offenA)) + '</div></a>' +
+        '<a class="kachel" href="#/posten"><div class="name">Noch nicht bezahlt (' + offenR.length + ')</div><div class="wert">' + SuS.euro(offenR.reduce((a, x) => a + SuS.offenerBetrag(x), 0)) + '</div></a>' +
+        '<a class="kachel' + (ueber.length ? ' warn' : '') + '" href="#/posten"><div class="name">Zu spät bezahlt (' + ueber.length + ')</div><div class="wert">' + SuS.euro(ueber.reduce((a, x) => a + SuS.offenerBetrag(x), 0)) + '</div></a>' +
         '<div class="kachel"><div class="name">Bezahlt ' + jahr + '</div><div class="wert">' + SuS.euro(summe(bezahlt)) + '</div></div>' +
       '</div>' +
       (zuletzt.length
-        ? '<h2>Zuletzt bearbeitet</h2><ul class="liste">' + zuletzt.map(dokZeile).join('') + '</ul>'
-        : '<div class="karte leer">' + ICON_LEER + '<p><b>Noch keine Angebote.</b><br>Erstellen Sie Ihr erstes Angebot – oder schauen Sie sich zuerst ein fertiges Beispiel an.</p>' +
-          '<button class="knopf zweit" data-a="beispiel">Beispiel ansehen</button></div>')
+        ? '<h2>Zuletzt</h2><ul class="liste">' + zuletzt.map(dokZeile).join('') + '</ul>'
+        : '<div class="karte leer">' + ICON_LEER + '<p><b>Noch nichts geschrieben.</b><br>Tippen Sie oben auf „Angebot schreiben“. Oder schauen Sie erst ein fertiges Beispiel an.</p>' +
+          '<button class="knopf zweit" data-a="beispiel">Beispiel ansehen</button></div>') +
+      '<button type="button" class="knopf breit gross" style="margin-top:18px" data-a="anleitung">❓ So geht’s – kurze Anleitung</button>'
     );
+    if (SuS.anleitungBeimStart) SuS.anleitungBeimStart();
   };
 
   A.neu = async (el) => {
@@ -205,7 +220,7 @@
       '<input class="suche" type="search" placeholder="Suchen: Kunde, Nummer, Betreff" value="' + e(SuS.ansicht.suche) + '" data-suche>' +
       '<div class="filter">' + filterListe.map(([k, t]) => '<button type="button" data-a="filter" data-key="' + filterKey + '" data-wert="' + k + '" class="' + (k === filter ? 'an' : '') + '">' + t + '</button>').join('') + '</div>' +
       (docs.length ? '<ul class="liste">' + docs.map(dokZeile).join('') + '</ul>'
-        : '<div class="karte leer">' + ICON_LEER + '<p>' + (filter === 'alle' && !q ? (istA ? 'Noch keine Angebote.' : 'Noch keine Rechnungen. Am schnellsten: ein angenommenes Angebot öffnen und „In Rechnung umwandeln“ tippen.') : 'Nichts gefunden.') + '</p></div>')
+        : '<div class="karte leer">' + ICON_LEER + '<p>' + (filter === 'alle' && !q ? (istA ? 'Noch keine Angebote.' : 'Noch keine Rechnungen. Am schnellsten: ein Angebot öffnen, auf „Kunde sagt Ja“ und dann „Jetzt Rechnung daraus machen“ tippen.') : 'Nichts gefunden.') + '</p></div>')
     );
   }
   SuS.seiten.angebote = () => liste('angebote');
@@ -330,41 +345,43 @@
     const eintrag = (href, titel, text) => '<li><a class="zeile" href="' + href + '"><div class="haupt"><div class="titel">' + titel + '</div><div class="klein">' + text + '</div></div><span aria-hidden="true">›</span></a></li>';
     SuS.zeige('<div class="kopf"><h1>Mehr</h1></div><ul class="liste">' +
       eintrag('#/kunden', 'Kunden', SuS.daten.kunden.length + ' Kunden') +
+      eintrag('#/ausgaben', 'Ausgaben', SuS.daten.ausgaben.length + ' · Material, Sprit, Kippe') +
+      eintrag('#/ablage', 'Papiere', SuS.daten.ablage.length + ' · Verträge, Versicherung, Lieferscheine') +
+      eintrag('#/firma', 'Meine Firma', 'Adresse, Steuernummer, Konto') +
+      eintrag('#/leistungen', 'Meine Preise', SuS.daten.leistungen.length + ' Arbeiten mit Preis') +
+      eintrag('#/sicherung', 'Daten sichern', 'Damit nichts verloren geht') +
+      '</ul>' +
+      '<details class="selten"><summary>Selten gebraucht</summary><ul class="liste">' +
       eintrag('#/mitarbeiter', 'Mitarbeiter', SuS.daten.mitarbeiter.length + ' · für Stunden und Wochenplan') +
-      eintrag('#/vertraege', 'Pflegeverträge', SuS.daten.vertraege.length + ' · wiederkehrende Rechnungen') +
-      eintrag('#/ausgaben', 'Ausgaben', SuS.daten.ausgaben.length + ' Belege · Material, Sprit, Kippe – mit Foto oder PDF') +
-      eintrag('#/ablage', 'Dokumente', SuS.daten.ablage.length + ' · Verträge, Versicherungen, Lieferscheine, Fahrzeug – durchsuchbar') +
-      eintrag('#/export', 'Für den Steuerberater', 'Rechnungsausgangsbuch, Ausgaben, DATEV') +
-      '<li><button class="zeile" data-a="eRechnungOeffnen"><div class="haupt"><div class="titel">Empfangene E-Rechnung ansehen</div><div class="klein">XRechnung oder ZUGFeRD-XML lesbar machen</div></div><span aria-hidden="true">›</span></button></li>' +
-      eintrag('#/firma', 'Firmendaten', 'Anschrift, Steuernummer, Bank, Kleinunternehmer') +
-      eintrag('#/leistungen', 'Leistungen & Preise', SuS.daten.leistungen.length + ' Leistungen · eigene Preise pflegen') +
-      eintrag('#/sicherung', 'Datensicherung', 'Verschlüsselt sichern, auf neues Gerät übertragen, wiederherstellen') +
-      eintrag('#/installieren', 'Auf dem Handy installieren', SuS.installiert ? 'Installiert ✓' : 'Mit Symbol auf dem Startbildschirm, auch offline') +
+      eintrag('#/vertraege', 'Pflegeverträge', SuS.daten.vertraege.length + ' · Rechnung jeden Monat') +
+      eintrag('#/export', 'Für den Steuerberater', 'Alles für den Steuerberater als Paket') +
+      '<li><button class="zeile" data-a="eRechnungOeffnen"><div class="haupt"><div class="titel">E-Rechnung öffnen</div><div class="klein">Eine Rechnungs-Datei (XML) lesbar machen</div></div><span aria-hidden="true">›</span></button></li>' +
+      eintrag('#/installieren', 'Aufs Handy holen', SuS.installiert ? 'Ist schon drauf ✓' : 'Mit Symbol auf dem Startbildschirm') +
       (SuS.eigenstaendig ? '' : eintrag('tageszettel/index.html', 'Tageszettel', 'Die bisherige Tageszettel-App')) +
-      eintrag('#/hilfe', 'Hinweise', 'Pflichtangaben, § 35a, E-Rechnung – kurz erklärt') +
-      '</ul><p class="unterzeile" style="margin-top:16px">Alle Daten bleiben auf diesem Gerät. Nichts wird ins Internet übertragen.</p>');
+      eintrag('#/hilfe', 'Hinweise', 'Was auf eine Rechnung muss – kurz erklärt') +
+      '</ul></details><p class="unterzeile" style="margin-top:16px">Alles bleibt auf diesem Gerät. Nichts geht ins Internet.</p>');
   };
 
   SuS.seiten.firma = () => {
     const f = SuS.daten.firma;
-    SuS.zeige('<button class="zurueck" data-a="zurueck" data-ziel="#/mehr">‹ Mehr</button><div class="kopf"><h1>Firmendaten</h1></div>' +
+    SuS.zeige('<button class="zurueck" data-a="zurueck" data-ziel="#/mehr">‹ Mehr</button><div class="kopf"><h1>Meine Firma</h1></div>' +
       '<form id="firmaForm" novalidate>' +
-      '<div class="karte"><h3>Betrieb</h3>' + SuS.feld('name', 'Firmenname', f.name) + SuS.feld('zusatz', 'Zusatz', f.zusatz) +
+      '<div class="karte"><h3>Betrieb</h3>' + SuS.feld('name', 'Firmenname', f.name) + SuS.feld('zusatz', 'Was macht die Firma? (kurz)', f.zusatz) +
       SuS.feld('inhaber', 'Inhaber / Ansprechpartner', f.inhaber, { platz: 'Vor- und Nachname' }) +
       SuS.feld('strasse', 'Straße und Hausnummer', f.strasse) + '<div class="plzort">' + SuS.feld('plz', 'PLZ', f.plz, { dezimal: true }) + SuS.feld('ort', 'Ort', f.ort) + '</div>' +
       '<div class="zwei">' + SuS.feld('telefon', 'Telefon', f.telefon, { typ: 'tel' }) + SuS.feld('email', 'E-Mail', f.email, { typ: 'email' }) + '</div>' + SuS.feld('web', 'Webseite', f.web) + '</div>' +
       '<div class="karte"><h3>Steuer</h3>' + '<div class="zwei">' + SuS.feld('steuernummer', 'Steuernummer', f.steuernummer) + SuS.feld('ustid', 'USt-IdNr.', f.ustid) + '</div>' +
-      '<p class="unterzeile" style="margin-top:-4px">Eins von beiden muss auf jede Rechnung.</p>' +
+      '<p class="unterzeile" style="margin-top:-4px">Eins von beiden reicht. Steht auf dem Brief vom Finanzamt.</p>' +
       '<label class="schalter"><input type="checkbox" name="kleinunternehmer"' + (f.kleinunternehmer ? ' checked' : '') + '><span><b>Kleinunternehmer (§ 19 UStG)</b><small>Dann wird keine Umsatzsteuer ausgewiesen. Nur ankreuzen, wenn das mit dem Finanzamt so vereinbart ist.</small></span></label>' +
       SuS.feld('mwst', 'Umsatzsteuersatz in %', SuS.zahl(f.mwst, 1), { dezimal: true }) + '</div>' +
-      '<div class="karte"><h3>Bankverbindung</h3>' + SuS.feld('bank', 'Bank', f.bank) + SuS.feld('iban', 'IBAN', f.iban, { platz: 'DE…' }) + SuS.feld('bic', 'BIC', f.bic) + '</div>' +
-      '<div class="karte"><h3>Voreinstellungen</h3><div class="zwei">' + SuS.feld('zahlungsziel', 'Zahlungsziel (Tage)', f.zahlungsziel, { dezimal: true }) +
+      '<div class="karte"><h3>Konto (für die Überweisung)</h3>' + SuS.feld('bank', 'Bank', f.bank) + SuS.feld('iban', 'IBAN', f.iban, { platz: 'DE…' }) + SuS.feld('bic', 'BIC', f.bic) + '</div>' +
+      '<details class="karte"><summary><b>Feineinstellungen (selten nötig)</b></summary><div style="height:12px"></div><div class="zwei">' + SuS.feld('zahlungsziel', 'Zahlungsziel (Tage)', f.zahlungsziel, { dezimal: true }) +
       SuS.feld('gueltigTage', 'Angebot gültig (Tage)', f.gueltigTage, { dezimal: true }) + '</div>' +
       '<div class="zwei">' + SuS.feld('skontoProzent', 'Skonto % (0 = keins)', f.skontoProzent ? SuS.zahl(f.skontoProzent, 2) : '', { dezimal: true, platz: '0' }) +
       SuS.feld('skontoTage', 'Skonto innerhalb (Tage)', f.skontoTage, { dezimal: true }) + '</div>' +
       SuS.feld('mahngebuehr', 'Mahngebühr ab der 1. Mahnung (€)', f.mahngebuehr ? SuS.centText(f.mahngebuehr) : '', { dezimal: true, platz: '0,00', hilfe: 'Nur tatsächliche Kosten (z. B. Porto); bei Privatkunden im Zweifel 0 lassen.' }) + '<div class="drei">' +
       SuS.feld('praefixAngebot', 'Kürzel Angebot', f.praefixAngebot) + SuS.feld('praefixRechnung', 'Kürzel Rechnung', f.praefixRechnung) +
-      SuS.feld('startRechnung', 'Nächste Rechnung Nr. ab', f.startRechnung, { dezimal: true, hilfe: 'Nur falls Sie eine bestehende Nummernfolge fortsetzen.' }) + '</div></div>' +
+      SuS.feld('startRechnung', 'Nächste Rechnung Nr. ab', f.startRechnung, { dezimal: true, hilfe: 'Nur falls Sie eine bestehende Nummernfolge fortsetzen.' }) + '</div></details>' +
       '<button class="knopf haupt breit" type="submit">Speichern</button></form>');
     const form = document.getElementById('firmaForm');
     /* Jede Änderung wird sofort übernommen (Fund von Cursor: Zurück ohne „Speichern“ verlor die Eingaben). */
@@ -397,7 +414,7 @@
     const gruppen = {};
     SuS.daten.leistungen.forEach((l) => { (gruppen[l.gruppe || 'Sonstiges'] = gruppen[l.gruppe || 'Sonstiges'] || []).push(l); });
     SuS.zeige('<button class="zurueck" data-a="zurueck" data-ziel="#/mehr">‹ Mehr</button>' +
-      '<div class="kopf"><h1>Leistungen & Preise</h1><button class="knopf haupt klein" data-a="leistungBearbeiten">+ Neu</button></div>' +
+      '<div class="kopf"><h1>Meine Preise</h1><button class="knopf haupt klein" data-a="leistungBearbeiten">+ Neu</button></div>' +
       (SuS.daten.firma.preiseGeprueft ? '' : '<div class="hinweis info"><b>Das sind Richtwerte (netto) – ' + e(SuS.katalog.STAND) + '.</b>Aus öffentlichen Quellen (Tariflohn, Entsorgungsgebühren, Marktpreise). Bitte durch Ihre eigenen Preise ersetzen. ' +
         '<div class="knopfreihe"><button class="knopf klein" data-a="richtwerte">Aktuelle Richtwerte übernehmen</button><button class="knopf klein" data-a="preiseOk">Erledigt – meine Preise stimmen</button></div></div>') +
       '<div class="knopfreihe"><button class="knopf klein" data-a="preiseAnpassen">Alle Preise um … % anpassen</button></div>' +
@@ -479,7 +496,7 @@
   SuS.seiten.sicherung = () => {
     const d = SuS.daten;
     const beispiele = d.kunden.some((k) => k.beispiel) || d.dokumente.some((x) => x.beispiel) || d.projekte.some((p) => p.beispiel);
-    SuS.zeige('<button class="zurueck" data-a="zurueck" data-ziel="#/mehr">‹ Mehr</button><div class="kopf"><h1>Datensicherung</h1></div>' +
+    SuS.zeige('<button class="zurueck" data-a="zurueck" data-ziel="#/mehr">‹ Mehr</button><div class="kopf"><h1>Daten sichern</h1></div>' +
       '<div class="karte"><p style="margin-top:0">Auf diesem Gerät: <b>' + d.kunden.length + ' Kunden, ' + d.dokumente.length + ' Angebote/Rechnungen, ' + d.leistungen.length + ' Leistungen</b>.</p>' +
       '<p class="unterzeile">Die Daten liegen nur hier. Wer das Gerät wechselt oder den Browserverlauf löscht, braucht eine Sicherung. Rechnungen sind Buchungsbelege und müssen 8 Jahre aufbewahrt werden – die PDFs zusätzlich ablegen.</p>' +
       '<button class="knopf haupt breit" data-a="sichernVerschluesselt" style="margin:6px 0 4px">🔒 Verschlüsselt sichern (empfohlen)</button>' +

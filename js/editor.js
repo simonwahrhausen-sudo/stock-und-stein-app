@@ -73,26 +73,26 @@
     const b = (a, text, klasse) => '<button type="button" class="knopf ' + (klasse || '') + '" data-a="' + a + '">' + text + '</button>';
     const r = [];
     if (dok.typ === 'angebot') {
-      if (dok.status === 'entwurf') r.push(b('versendet', 'Als versendet markieren', 'zweit'));
-      if (dok.status === 'versendet' || dok.status === 'entwurf') r.push(b('angenommen', 'Auftrag erhalten ✓', 'zweit'));
-      if (dok.status === 'versendet') r.push(b('abgelehnt', 'Abgelehnt'));
+      if (dok.status === 'entwurf') r.push(b('versendet', 'Habe ich verschickt', 'zweit'));
+      if (dok.status === 'versendet' || dok.status === 'entwurf') r.push(b('angenommen', 'Kunde sagt Ja ✓', 'zweit'));
+      if (dok.status === 'versendet') r.push(b('abgelehnt', 'Kunde sagt Nein'));
       if (dok.status === 'versendet' && SuS.nachfassen().includes(dok)) r.push(b('nachgefasst', 'Nachgefasst – in ' + SuS.NACHFASSEN_TAGE + ' Tagen wieder erinnern'));
       if (dok.status === 'angenommen') {
         const rz = SuS.rechnungZu(dok);
         if (rz) r.push('<a class="knopf haupt" href="#/dok/' + e(rz.id) + '">' + e(SuS.TYPEN[rz.typ].name) + ' öffnen</a>');
-        else r.push(b('inRechnung', 'In Rechnung umwandeln', 'haupt'), b('abschlag', 'Abschlagsrechnung'));
+        else r.push(b('inRechnung', 'Jetzt Rechnung daraus machen', 'haupt'), b('abschlag', 'Abschlagsrechnung'));
         r.push(b('auftragDruck', 'Auftragsbestätigung'));
       }
-      if (['entwurf', 'versendet'].includes(dok.status) && !SuS.angebotGesperrt(dok)) r.push(b('unterschrift', '✍︎ Vor Ort unterschreiben lassen'));
+      if (['entwurf', 'versendet'].includes(dok.status) && !SuS.angebotGesperrt(dok)) r.push(b('unterschrift', '✍︎ Kunde unterschreibt hier'));
       if ((dok.status === 'abgelehnt' || dok.status === 'angenommen') && !SuS.folge(dok).length && !dok.unterschrift) r.push(b('wiederOffen', 'Status zurücksetzen'));
       r.push(b('duplizieren', SuS.angebotGesperrt(dok) || dok.unterschrift ? 'Nachtrag (Kopie)' : 'Duplizieren'));
       if (dok.positionen.length) r.push(b('alsVorlage', 'Als Vorlage speichern'));
       if (!SuS.folge(dok).some((x) => x.fest) && !dok.unterschrift) r.push(b('loeschen', 'Löschen', 'gefahr'));
     } else if (!dok.fest) {
-      r.push(b('stellen', 'Rechnung stellen', 'haupt'), b('loeschen', 'Entwurf löschen', 'gefahr'));
+      r.push(b('stellen', 'Rechnung fertig machen', 'haupt'), b('loeschen', 'Entwurf löschen', 'gefahr'));
     } else if (dok.typ !== 'storno' && dok.status !== 'storniert') {
       if (dok.status !== 'bezahlt') {
-        r.push(b('bezahlt', 'Zahlung erfassen', 'haupt'));
+        r.push(b('bezahlt', 'Geld ist da', 'haupt'));
         const stufe = SuS.mahnstufe(dok);
         if (SuS.faellig(dok) < SuS.heute() && stufe < 3 && SuS.naechsteMahnungAb(dok) <= SuS.heute()) r.push(b('mahnen', SuS.MAHNSTUFEN[stufe] + ' erstellen'));
         if (stufe) r.push(b('mahnungDruck', SuS.MAHNSTUFEN[stufe - 1] + ' erneut drucken'));
@@ -132,20 +132,22 @@
         (dok.status === 'bezahlt' ? ' Bezahlt am ' + SuS.datum(dok.bezahltAm) + '.' : '') + '</div>' : '') +
       (dok.typ === 'angebot' && fest ? '<div class="gesperrt" style="margin-top:12px">' + (dok.unterschrift ? 'Vom Kunden unterschrieben' : 'Zu diesem Angebot gibt es gestellte Rechnungen') + ' – es ist deshalb gesperrt. Zusätzliche Arbeiten: „Nachtrag (Kopie)“ anlegen.</div>' : '') +
       (dok.typ === 'angebot' && !fest && dok.status === 'versendet' ? '<div class="hinweis info" style="margin-top:12px">Bereits versendet. Wenn Sie etwas ändern, schicken Sie das Angebot bitte neu.</div>' : '') +
-      '<h2>Kunde & Bauvorhaben</h2><div class="karte">' + kundenKarte(dok) + '<div style="height:12px"></div>' +
+      '<h2><span class="schritt">1</span>Für wen?</h2><div class="karte">' + kundenKarte(dok) + '<div style="height:12px"></div>' +
+      feld('betreff', 'Worum geht es? (kurz)', dok.betreff, 'text', dis + ' placeholder="z. B. Neue Terrasse hinter dem Haus"') +
+      '<details class="mehrangaben"' + (dok.projektId || dok.baustelle ? ' open' : '') + '><summary>Mehr Angaben (Datum, Baustelle)</summary><div style="height:10px"></div>' +
       '<label class="feld"><span>Baustelle</span><select data-dokfeld="projektId"' + dis + '><option value="">– keine –</option>' +
         SuS.daten.projekte.map((p) => '<option value="' + e(p.id) + '"' + (p.id === dok.projektId ? ' selected' : '') + '>' + e(p.nr + ' · ' + p.titel) + '</option>').join('') + '</select>' +
         (dok.projektId && SuS.projekt(dok.projektId) ? '<small><a href="#/baustelle/' + e(dok.projektId) + '">Zur Baustelle</a></small>' : '') + '</label>' +
-      feld('betreff', 'Betreff', dok.betreff, 'text', dis + ' placeholder="z. B. Neue Terrasse hinter dem Haus"') +
-      feld('baustelle', 'Bauvorhaben / Baustelle', dok.baustelle, 'text', dis + ' placeholder="Anschrift der Baustelle, falls abweichend"') + datumsfelder + '</div>' +
-      '<h2>Positionen</h2><div class="karte">' +
+      feld('baustelle', 'Adresse der Baustelle (falls anders)', dok.baustelle, 'text', dis + ' placeholder="Straße, Ort"') + datumsfelder + '</details></div>' +
+      '<h2><span class="schritt">2</span>Was wird gemacht?</h2><div class="karte">' +
       (dok.positionen.length ? '<ul class="positionen">' + dok.positionen.map((p, i) => positionZeile(dok, p, nrn[i])).join('') + '</ul>'
-        : '<p class="unterzeile" style="margin-top:0">Noch keine Positionen. Am schnellsten geht es mit einem Schnellpaket – z. B. „Terrasse pflastern“: Fläche eingeben, fertig.</p>') +
-      (fest ? '' : '<div class="hinzu"><button type="button" class="knopf zweit" data-a="paket">⚡ Schnellpaket</button><button type="button" class="knopf zweit" data-a="ausKatalog">+ Aus Leistungen</button>' +
-        '<button type="button" class="knopf" data-a="neuePos">+ Freie Position</button><button type="button" class="knopf" data-a="neuerTitel">+ Überschrift</button></div>') +
+        : '<p class="unterzeile" style="margin-top:0">Noch leer. Am einfachsten: <b>„Schnell-Auswahl“</b> antippen, z. B. „Terrasse pflastern“, Fläche eingeben, fertig.</p>') +
+      (fest ? '' : '<div class="hinzu"><button type="button" class="knopf zweit" data-a="paket">⚡ Schnell-Auswahl</button><button type="button" class="knopf zweit" data-a="ausKatalog">Aus meinen Preisen</button>' +
+        '<button type="button" class="knopf" data-a="neuePos">Selbst eintippen</button><button type="button" class="knopf" data-a="neuerTitel">+ Überschrift</button></div>' +
+        '<p class="sprechtipp">🎤 Tipp: Statt tippen einfach sprechen. Auf der Tastatur das Mikrofon drücken.</p>') +
       '</div>' +
       '<div class="karte">' + summenKarte(dok) + '</div>' +
-      '<details class="karte"' + (dok.einleitung || dok.schluss || dok.rabatt ? ' open' : '') + '><summary><b>Texte, Nachlass & Steuer</b></summary><div style="height:12px"></div>' +
+      '<details class="karte"' + (dok.einleitung || dok.schluss || dok.rabatt ? ' open' : '') + '><summary><b>Texte, Rabatt & Steuer (selten nötig)</b></summary><div style="height:12px"></div>' +
       feld('einleitung', 'Einleitungstext (leer = Standardtext)', dok.einleitung, 'textarea', dis) +
       feld('schluss', 'Schlusstext (leer = Standardtext mit Frist/Gültigkeit)', dok.schluss, 'textarea', dis) +
       (dis ? '' : '<div class="knopfreihe eng" style="margin-top:-4px"><button type="button" class="knopf klein" data-a="bausteinWahl">Textbaustein einfügen</button>' +
@@ -158,9 +160,9 @@
       '</details>' +
       zahlungenKarte(dok) + (dok.unterschrift ? '<div class="karte"><h3>Unterschrift</h3><img src="' + e(dok.unterschrift.bild) + '" alt="Unterschrift" style="max-width:100%;height:90px;object-fit:contain;background:#fff;border-radius:8px">' +
         '<div class="unterzeile">' + e(dok.unterschrift.name) + ', ' + SuS.datum(dok.unterschrift.datum) + '</div></div>' : '') +
-      '<h2>Weiter</h2>' + aktionen(dok) + verknuepft(dok) +
+      '<h2><span class="schritt">3</span>Fertig? Unten auf „Ansehen & senden“</h2>' + aktionen(dok) + verknuepft(dok) +
       '<div class="aktionsleiste"><div class="summe"><small>' + (s.abzuege.length ? 'Noch zu zahlen' : s.modus === 'regel' ? 'Gesamt inkl. USt' : 'Gesamt') + '</small><b>' + SuS.euro(s.zahlbetrag) + '</b></div>' +
-      '<button type="button" class="knopf haupt" data-a="vorschau">Vorschau & PDF</button></div>', true);
+      '<button type="button" class="knopf haupt" data-a="vorschau">Ansehen & senden</button></div>', true);
   };
 
   /* Textbausteine für Einleitung und Schluss (z. B. „Pflege – Angebot“, „Zahlung in bar“) */
@@ -388,7 +390,7 @@
   A.alsVorlage = () => {
     const d = aktuell;
     SuS.blatt('Als Vorlage speichern', SuS.feld('name', 'Name der Vorlage', d.betreff || '', { auto: true, platz: 'z. B. Terrasse 20 m² mit Rasen' }) +
-      '<p class="unterzeile">Alle Positionen werden als eigenes Schnellpaket gespeichert und stehen in jedem neuen Angebot unter „Schnellpaket“.</p>', (fd) => {
+      '<p class="unterzeile">Alle Positionen werden als eigenes Schnellpaket gespeichert und stehen in jedem neuen Angebot unter „Schnell-Auswahl“.</p>', (fd) => {
       const v = SuS.vorlageSpeichern(d, String(fd.get('name') || ''));
       SuS.speichern(); SuS.melde('Vorlage „' + v.name + '“ gespeichert.'); return true;
     }, 'Speichern');
@@ -495,7 +497,7 @@
     if (!(await SuS.transaktionSicher(() => { r = SuS.rechnungAus(SuS.dok(id)); r.leistungVon = SuS.heute(); r.geaendert = new Date().toISOString(); }))) {
       SuS.melde('Speichern fehlgeschlagen – keine Rechnung angelegt.', true); frisch(id); neu(); return;  // Funde Codex/Cursor R13
     }
-    SuS.melde(r.typ === 'schluss' ? 'Schlussrechnung angelegt – Abschläge werden abgezogen.' : 'Rechnung angelegt. Mengen nach Aufmaß prüfen, dann „Rechnung stellen“.');
+    SuS.melde(r.typ === 'schluss' ? 'Schlussrechnung angelegt – Abschläge werden abgezogen.' : 'Rechnung angelegt. Mengen nach Aufmaß prüfen, dann „Rechnung fertig machen“.');
     SuS.gehZu('#/dok/' + r.id, marke);
   };
 
